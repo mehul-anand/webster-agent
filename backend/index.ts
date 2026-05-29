@@ -11,7 +11,7 @@ const app = express();
 
 app.use(express.json());
 
-app.post("/ppl_ask", async (req, res) => {
+app.post("/webster_ask", async (req, res) => {
   // get the user's query
   const query = req.body.query;
   // check for access/credits
