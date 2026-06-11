@@ -2,6 +2,7 @@ import { tavily } from "@tavily/core";
 import express from "express";
 import OpenAI from "openai";
 import "dotenv/config";
+import { prisma } from "./db.ts";
 
 import { SYSTEM_PROMPT, PROMPT_TEMPLATE } from "./prompts";
 
@@ -11,9 +12,45 @@ const app = express();
 
 app.use(express.json());
 
-app.post("/webster_ask", async (req, res) => {
+// end points
+
+// // testing
+// async function testDb() {
+//   const res = await prisma.user.create({
+//     data: {
+//       email: "mehul.test@gmail.com",
+//
+//       provider: "Github",
+//
+//       name: "Mehul",
+//     },
+//   });
+//
+//   console.log(res);
+// }
+//
+// testDb();
+
+// Signup
+app.post("/signup", async (req, res) => { });
+
+// Signin
+app.post("/signin", async (req, res) => { });
+
+// Get all past conversations
+app.get("/conversations", async (req, res) => { });
+
+// Get a specific conversation
+app.get("/conversation/:conversationId", async (req, res) => { });
+
+app.post("/webster/ask", async (req, res) => {
   // get the user's query
   const query = req.body.query;
+  if (!query) {
+    return res.status(400).json({
+      error: "Query is required",
+    });
+  }
   // check for access/credits
 
   // TODO: check if we have web search indexed for the query
@@ -65,4 +102,9 @@ app.post("/webster_ask", async (req, res) => {
   res.end();
 });
 
-app.listen(3000);
+// follow up part
+app.post("/webster/follow-up", async (req, res) => { });
+
+app.listen(3000, () => {
+  console.log("Server running on port 3000");
+});
