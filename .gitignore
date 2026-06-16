@@ -1,4 +1,5 @@
 backend/.env
+frontend/.env
 backend/test.ts
 backend/node_modules/
 backend/generated/
