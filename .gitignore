@@ -1,4 +1,6 @@
 backend/.env
 backend/test.ts
+backend/node_modules/
+backend/generated/
 test/
 .DS_Store
