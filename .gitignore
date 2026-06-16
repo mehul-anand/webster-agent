@@ -1,2 +1,4 @@
 backend/.env
 backend/test.ts
+test/
+.DS_Store
