@@ -3,14 +3,17 @@ import express from "express";
 import OpenAI from "openai";
 import "dotenv/config";
 import { prisma } from "./db.ts";
+import cors from "cors";
 
 import { SYSTEM_PROMPT, PROMPT_TEMPLATE } from "./prompts";
+import { middleware } from "./middleware";
 
 const client = tavily({ apiKey: process.env.TAVILY_API_KEY });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const app = express();
 
 app.use(express.json());
+app.use(cors());
 
 // end points
 
@@ -31,44 +34,51 @@ app.use(express.json());
 //
 // testDb();
 
-// Signup
-app.post("/signup", async (req, res) => { });
-
-// Signin
-app.post("/signin", async (req, res) => { });
-
-// Get all past conversations
-app.get("/conversations", async (req, res) => { });
-
-// Get a specific conversation
-app.get("/conversation/:conversationId", async (req, res) => { });
-
-app.post("/webster/ask", async (req, res) => {
-  // get the user's query
+app.post("/webster/ask", middleware, async (req, res) => {
   const query = req.body.query;
   if (!query) {
     return res.status(400).json({
       error: "Query is required",
     });
   }
-  // check for access/credits
 
-  // TODO: check if we have web search indexed for the query
+  const user = await prisma.user.findUnique({
+    where: { supabaseId: req.userId },
+  });
 
-  // web search to get the resources
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const slug =
+    query.match(/[a-z0-9]+/gi)?.join("-").slice(0, 80) ||
+    `conv-${Date.now()}`;
+
+  const conversation = await prisma.conversation.create({
+    data: {
+      title: query.slice(0, 100),
+      slug,
+      userId: user.id,
+    },
+  });
+
   const webSearchResponse = await client.search(query, {
     searchDepth: "advanced",
   });
   const webSearchResult = webSearchResponse.results;
-
-  // context engineering : prompt + web search responses
 
   const prompt = PROMPT_TEMPLATE.replace(
     "{{WEB_SEARCH_RESULTS}}",
     JSON.stringify(webSearchResult),
   ).replace("{{USER_QUERY}}", query);
 
-  // hit the LLM
+  await prisma.message.create({
+    data: {
+      content: query,
+      role: "User",
+      conversationId: conversation.id,
+    },
+  });
 
   const stream = await openai.chat.completions.create({
     model: "gpt-4.1-mini",
@@ -78,18 +88,20 @@ app.post("/webster/ask", async (req, res) => {
     ],
     stream: true,
   });
+
   res.header("Cache-Control", "no-cache");
   res.header("Content-Type", "text/event-stream");
 
-  // also stream back the responses and follow ups (in parallel from another LLM call)
+  res.write(`<CONVERSATION_ID>${conversation.id}</CONVERSATION_ID>\n`);
+
+  let fullResponse = "";
   for await (const chunk of stream) {
     const text = chunk.choices[0]?.delta?.content || "";
+    fullResponse += text;
     res.write(text);
   }
 
-  // end stream
   res.write("\n<SOURCES>\n");
-  // webSearchResult.forEach((result) => res.write(JSON.stringify(result)));
   res.write(
     JSON.stringify(
       webSearchResult.map((result) => ({
@@ -100,11 +112,153 @@ app.post("/webster/ask", async (req, res) => {
   res.write("\n</SOURCES>\n");
 
   res.end();
+
+  await prisma.message.create({
+    data: {
+      content: fullResponse,
+      role: "Assistant",
+      conversationId: conversation.id,
+    },
+  });
 });
 
-// follow up part
-app.post("/webster/follow-up", async (req, res) => { });
+// Get all past conversations
+app.get("/conversations", middleware, async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { supabaseId: req.userId },
+    include: {
+      conversations: {
+        orderBy: { messages: { _count: "desc" } },
+        include: {
+          messages: {
+            take: 1,
+            orderBy: { createdAt: "desc" },
+          },
+          _count: { select: { messages: true } },
+        },
+      },
+    },
+  });
 
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+  if (!user) {
+    return res.json([]);
+  }
+
+  res.json(user.conversations);
+});
+
+// Get a specific conversation
+app.get("/conversation/:conversationId", middleware, async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { supabaseId: req.userId },
+  });
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: String(req.params.conversationId), userId: user.id },
+    include: {
+      messages: { orderBy: { createdAt: "asc" } },
+    },
+  });
+
+  if (!conversation) {
+    return res.status(404).json({ error: "Conversation not found" });
+  }
+
+  res.json(conversation);
+});
+
+// Follow-up within an existing conversation
+app.post("/webster/follow-up", middleware, async (req, res) => {
+  const { conversationId, query } = req.body;
+
+  if (!conversationId || !query) {
+    return res.status(400).json({ error: "conversationId and query are required" });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { supabaseId: req.userId },
+  });
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: conversationId, userId: user.id },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
+  });
+
+  if (!conversation) {
+    return res.status(404).json({ error: "Conversation not found" });
+  }
+
+  const webSearchResponse = await client.search(query, {
+    searchDepth: "advanced",
+  });
+  const webSearchResult = webSearchResponse.results;
+
+  const historyMessages = conversation.messages.map((m) => ({
+    role: m.role === "User" ? "user" : "assistant",
+    content: m.content,
+  })) as ({ role: "user" | "assistant"; content: string })[];
+
+  const followUpPrompt = PROMPT_TEMPLATE.replace(
+    "{{WEB_SEARCH_RESULTS}}",
+    JSON.stringify(webSearchResult),
+  ).replace("{{USER_QUERY}}", query);
+
+  await prisma.message.create({
+    data: {
+      content: query,
+      role: "User",
+      conversationId: conversation.id,
+    },
+  });
+
+  const stream = await openai.chat.completions.create({
+    model: "gpt-4.1-mini",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...historyMessages,
+      { role: "user", content: followUpPrompt },
+    ],
+    stream: true,
+  });
+
+  res.header("Cache-Control", "no-cache");
+  res.header("Content-Type", "text/event-stream");
+
+  let fullResponse = "";
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content || "";
+    fullResponse += text;
+    res.write(text);
+  }
+
+  res.write("\n<SOURCES>\n");
+  res.write(
+    JSON.stringify(
+      webSearchResult.map((result) => ({
+        url: result.url,
+      })),
+    ),
+  );
+  res.write("\n</SOURCES>\n");
+
+  res.end();
+
+  await prisma.message.create({
+    data: {
+      content: fullResponse,
+      role: "Assistant",
+      conversationId: conversation.id,
+    },
+  });
+});
+app.listen(3001, () => {
+  console.log("Server running on port 3001");
 });
