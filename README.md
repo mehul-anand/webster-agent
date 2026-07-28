@@ -1,7 +1,5 @@
 # webster-agent
 
-# Webster Agent
-
 A full-stack, web-search-augmented AI chat application. User queries are answered in real time by combining live web search results (via Tavily) with GPT-4.1-mini streaming responses — similar in spirit to Perplexity. Conversations are persisted per user, with cited sources and AI-generated follow-up questions surfaced after each response.
 
 ---
