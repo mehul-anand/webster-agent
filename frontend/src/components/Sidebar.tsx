@@ -32,6 +32,8 @@ export function Sidebar({
   onOpenThemePicker,
   onLogout,
   searchInputRef,
+  streaming,
+  onSelectPending,
 }: {
   open: boolean;
   isMobile: boolean;
@@ -52,6 +54,8 @@ export function Sidebar({
   onOpenThemePicker: () => void;
   onLogout: () => void;
   searchInputRef: React.RefObject<HTMLInputElement | null>;
+  streaming: { key: string; convId: string | null; title: string }[];
+  onSelectPending: (key: string) => void;
 }) {
   const term = search.toLowerCase();
   const filtered = conversations.filter(
@@ -59,6 +63,10 @@ export function Sidebar({
       c.title?.toLowerCase().includes(term) ||
       c.slug.toLowerCase().includes(term) ||
       c.messages[0]?.content?.toLowerCase().includes(term),
+  );
+  const pendingStreams = streaming.filter((s) => s.convId === null);
+  const streamingIds = new Set(
+    streaming.map((s) => s.convId).filter((v): v is string => v !== null),
   );
 
   return (
@@ -158,7 +166,10 @@ export function Sidebar({
                   ))}
                 </div>
               )}
-              {!conversationsLoading && filtered.length === 0 && !search && (
+              {!conversationsLoading &&
+                filtered.length === 0 &&
+                !search &&
+                pendingStreams.length === 0 && (
                 <p
                   className="px-3 py-4 text-center text-xs"
                   style={{ color: "var(--text-muted)" }}
@@ -174,12 +185,36 @@ export function Sidebar({
                   No matches
                 </p>
               )}
+              {pendingStreams.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => onSelectPending(p.key)}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <span
+                    className="size-2 shrink-0 animate-pulse rounded-full"
+                    style={{ background: "var(--accent)" }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">
+                      {p.title || "New chat…"}
+                    </div>
+                    <div
+                      className="mt-0.5 truncate text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Generating…
+                    </div>
+                  </div>
+                </button>
+              ))}
               {filtered.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => onSelect(c.id)}
                   className={cn(
-                    "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]",
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]",
                     activeId === c.id && "bg-[var(--bg-active)]",
                   )}
                   style={{
@@ -189,15 +224,24 @@ export function Sidebar({
                         : "var(--text-secondary)",
                   }}
                 >
-                  <div className="truncate text-sm font-medium">
-                    {c.title || c.slug}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">
+                      {c.title || c.slug}
+                    </div>
+                    <div
+                      className="mt-0.5 truncate text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {conversationPreview(c)}
+                    </div>
                   </div>
-                  <div
-                    className="mt-0.5 truncate text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    {conversationPreview(c)}
-                  </div>
+                  {streamingIds.has(c.id) && (
+                    <span
+                      className="size-2 shrink-0 animate-pulse rounded-full"
+                      style={{ background: "var(--accent)" }}
+                      title="Generating…"
+                    />
+                  )}
                 </button>
               ))}
             </div>

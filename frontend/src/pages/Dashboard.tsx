@@ -10,6 +10,9 @@ import { InputBar } from "@/components/InputBar";
 import { EmptyState } from "@/components/EmptyState";
 import { FindBar } from "@/components/FindBar";
 import { TypingDots } from "@/components/TypingDots";
+import { LandingGate } from "@/components/LandingGate";
+import { AnswerNotification } from "@/components/AnswerNotification";
+import type { AnswerToast } from "@/components/AnswerNotification";
 import type { Message, Conversation } from "@/types/dashboard";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 
@@ -26,6 +29,22 @@ function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+type ActiveStream = {
+  key: string;
+  convId: string | null;
+  title: string;
+  controller: AbortController;
+  buffer: string;
+  msgId: number | null;
+  error: boolean;
+};
+
+type StreamInfo = {
+  key: string;
+  convId: string | null;
+  title: string;
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,7 +53,6 @@ export default function Dashboard() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -45,6 +63,8 @@ export default function Dashboard() {
   const [findOpen, setFindOpen] = useState(false);
   const [findText, setFindText] = useState("");
   const [findMatchIndex, setFindMatchIndex] = useState(0);
+  const [streamingList, setStreamingList] = useState<StreamInfo[]>([]);
+  const [toasts, setToasts] = useState<AnswerToast[]>([]);
 
   const isMobile = useMediaQuery("(max-width: 767px)");
 
@@ -52,8 +72,10 @@ export default function Dashboard() {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
-  const abortRef = useRef<AbortController | null>(null);
-  const streamBufferRef = useRef("");
+  const streamsRef = useRef(new Map<string, ActiveStream>());
+  const activeIdRef = useRef<string | null>(null);
+  const pendingKeyRef = useRef("");
+  const navEpochRef = useRef(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -72,12 +94,16 @@ export default function Dashboard() {
     "Got a question, {name}?",
   ];
   const greeting = useRef(greetings[Math.floor(Math.random() * greetings.length)]);
-  const suggestions = [
-    "What's the latest in AI this week?",
-    "Explain quantum computing simply",
-    "Best practices for React performance",
-    "Compare Claude vs GPT-4",
+  const prompts = [
+    { title: "What's new in AI this week?", subtitle: "Get the latest with live web search" },
+    { title: "Explain quantum computing", subtitle: "A simple, plain-English breakdown" },
+    { title: "React performance tips", subtitle: "Best practices for faster apps" },
+    { title: "Compare Claude vs GPT-4", subtitle: "Strengths and weaknesses side-by-side" },
   ];
+
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -186,55 +212,102 @@ export default function Dashboard() {
     }
   }, [activeId, setSearchParams]);
 
+  function isStreamRenderable(s: ActiveStream) {
+    if (s.convId !== null) return activeIdRef.current === s.convId;
+    return activeIdRef.current === null && pendingKeyRef.current === s.key;
+  }
+
   async function selectConversation(id: string) {
+    navEpochRef.current += 1;
+    activeIdRef.current = id;
     setActiveId(id);
     setQuery("");
     setChatMessages([]);
     setChatLoading(true);
-    streamBufferRef.current = "";
     const jwt = await getJwt();
     const { data } = await axios.get(
       `${import.meta.env.VITE_BACKEND_URL}/conversation/${id}`,
       { headers: { Authorization: `Bearer ${jwt}` } },
     );
-    setChatMessages(data.messages);
+    let msgs: Message[] = data.messages;
+    const s = streamsRef.current.get(id);
+    if (s && s.buffer) {
+      if (s.msgId === null) s.msgId = Date.now();
+      msgs = [
+        ...msgs,
+        { id: s.msgId, content: s.buffer, role: "Assistant", createdAt: new Date().toISOString() },
+      ];
+    }
+    setChatMessages(msgs);
     setChatLoading(false);
   }
 
   function newChat() {
+    navEpochRef.current += 1;
+    activeIdRef.current = null;
     setActiveId(null);
     setChatMessages([]);
     setQuery("");
-    streamBufferRef.current = "";
+  }
+
+  function viewPendingStream(key: string) {
+    const s = streamsRef.current.get(key);
+    if (!s) return;
+    navEpochRef.current += 1;
+    activeIdRef.current = null;
+    pendingKeyRef.current = key;
+    setActiveId(null);
+    const msgs: Message[] = [];
+    if (s.title) {
+      msgs.push({ id: Date.now(), content: s.title, role: "User", createdAt: new Date().toISOString() });
+    }
+    if (s.buffer) {
+      if (s.msgId === null) s.msgId = Date.now();
+      msgs.push({ id: s.msgId, content: s.buffer, role: "Assistant", createdAt: new Date().toISOString() });
+    }
+    setChatMessages(msgs);
+    setQuery("");
   }
 
   async function ask(overrideQuery?: string) {
     const q = (overrideQuery ?? query).trim();
-    if (!q || loading) return;
-    setLoading(true);
-    streamBufferRef.current = "";
-    const jwt = await getJwt();
-    abortRef.current = new AbortController();
+    if (!q || viewStreaming) return;
 
+    const target = activeId;
+    const key = target ?? `new-${Date.now()}`;
+    if (streamsRef.current.has(key)) return;
+
+    const controller = new AbortController();
+    const stream: ActiveStream = {
+      key,
+      convId: target,
+      title: q,
+      controller,
+      buffer: "",
+      msgId: null,
+      error: false,
+    };
+    streamsRef.current.set(key, stream);
+    if (!target) pendingKeyRef.current = key;
+    setStreamingList((prev) => [...prev, { key, convId: target, title: q }]);
+
+    const startEpoch = navEpochRef.current;
     const userMsg: Message = {
       id: Date.now(),
       content: q,
       role: "User",
       createdAt: new Date().toISOString(),
     };
-    if (activeId) {
-      setChatMessages((prev) => [...prev, userMsg]);
-    } else {
-      setChatMessages([userMsg]);
-    }
+    setChatMessages((prev) => (target ? [...prev, userMsg] : [userMsg]));
     setQuery("");
 
-    const endpoint = activeId ? `/webster/follow-up` : `/webster/ask`;
-    const body = activeId
-      ? { conversationId: activeId, query: q }
+    const endpoint = target ? `/webster/follow-up` : `/webster/ask`;
+    const body = target
+      ? { conversationId: target, query: q }
       : { query: q };
 
     try {
+      const jwt = await getJwt();
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND_URL}${endpoint}`,
         {
@@ -244,7 +317,7 @@ export default function Dashboard() {
             Authorization: `Bearer ${jwt}`,
           },
           body: JSON.stringify(body),
-          signal: abortRef.current.signal,
+          signal: controller.signal,
         },
       );
 
@@ -256,24 +329,42 @@ export default function Dashboard() {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        streamBufferRef.current = buffer;
+        const s = streamsRef.current.get(key);
+        if (!s) break;
+        s.buffer = buffer;
 
         const convMatch = buffer.match(
           /<CONVERSATION_ID>(.*?)<\/CONVERSATION_ID>\n?/,
         );
         if (convMatch) {
-          setActiveId(convMatch[1]);
+          const convId = convMatch[1];
           buffer = buffer.replace(convMatch[0], "");
+          s.convId = convId;
+          s.buffer = buffer;
+          setStreamingList((prev) =>
+            prev.map((e) => (e.key === key ? { ...e, convId } : e)),
+          );
+          if (
+            activeIdRef.current === null &&
+            (startEpoch === navEpochRef.current || pendingKeyRef.current === key)
+          ) {
+            activeIdRef.current = convId;
+            setActiveId(convId);
+          }
         }
 
+        if (!isStreamRenderable(s)) continue;
+
+        if (s.msgId === null) s.msgId = Date.now();
+        const mid = s.msgId;
         setChatMessages((prev) => {
           const last = prev[prev.length - 1];
-          if (last && last.role === "Assistant")
+          if (last && last.role === "Assistant" && last.id === mid)
             return [...prev.slice(0, -1), { ...last, content: buffer }];
           return [
             ...prev,
             {
-              id: Date.now(),
+              id: mid,
               content: buffer,
               role: "Assistant" as const,
               createdAt: new Date().toISOString(),
@@ -282,26 +373,48 @@ export default function Dashboard() {
         });
       }
     } catch (err) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            content: "Error: " + err.message,
-            role: "Assistant",
-            createdAt: new Date().toISOString(),
-          },
-        ]);
+      const s = streamsRef.current.get(key);
+      if (s) s.error = true;
+      if (err instanceof Error && err.name !== "AbortError" && !controller.signal.aborted) {
+        const s2 = streamsRef.current.get(key);
+        if (s2 && isStreamRenderable(s2)) {
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now(),
+              content: "Error: " + err.message,
+              role: "Assistant",
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+        }
       }
     } finally {
-      setLoading(false);
-      abortRef.current = null;
+      const s = streamsRef.current.get(key);
+      streamsRef.current.delete(key);
+      if (pendingKeyRef.current === key) pendingKeyRef.current = "";
+      setStreamingList((prev) => prev.filter((e) => e.key !== key));
+      if (s && !s.error && !controller.signal.aborted && s.convId && activeIdRef.current !== s.convId) {
+        setToasts((prev) => [...prev, { key, convId: s.convId!, title: s.title }]);
+      }
       fetchConversations();
     }
   }
 
   function stop() {
-    abortRef.current?.abort();
+    const s = activeId
+      ? streamsRef.current.get(activeId)
+      : streamsRef.current.get(pendingKeyRef.current);
+    s?.controller.abort();
+  }
+
+  function dismissToast(key: string) {
+    setToasts((prev) => prev.filter((t) => t.key !== key));
+  }
+
+  function viewToast(t: AnswerToast) {
+    dismissToast(t.key);
+    selectConversation(t.convId);
   }
 
   async function logout() {
@@ -372,28 +485,16 @@ export default function Dashboard() {
   }
 
   if (!user) {
-    return (
-      <div
-        className="flex min-h-screen items-center justify-center"
-        style={{ background: "var(--bg)" }}
-      >
-        <button
-          onClick={() => navigate("/auth")}
-          className="rounded-xl border px-6 py-3 text-sm font-medium transition-opacity hover:opacity-80"
-          style={{
-            background: "var(--bg-surface)",
-            borderColor: "var(--border)",
-            color: "var(--text-primary)",
-          }}
-        >
-          Sign in to continue
-        </button>
-      </div>
-    );
+    return <LandingGate onSignIn={() => navigate("/auth")} />;
   }
 
   const firstName = user.user_metadata.full_name?.split(" ")[0] || "there";
   const activeTitle = conversations.find((c) => c.id === activeId)?.title;
+  const viewStreaming = streamingList.some((e) =>
+    activeId
+      ? e.convId === activeId
+      : e.convId === null && e.key === pendingKeyRef.current,
+  );
 
   return (
     <div
@@ -411,9 +512,14 @@ export default function Dashboard() {
         searchOpen={searchOpen}
         themePickerOpen={themePickerOpen}
         conversationsLoading={conversationsLoading}
+        streaming={streamingList}
         onNewChat={newChat}
         onSelect={(id) => {
           selectConversation(id);
+          if (isMobile) setSidebarOpen(false);
+        }}
+        onSelectPending={(key) => {
+          viewPendingStream(key);
           if (isMobile) setSidebarOpen(false);
         }}
         onClose={() => setSidebarOpen(false)}
@@ -506,18 +612,18 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-          {!chatLoading && chatMessages.length === 0 && !loading && (
+          {!chatLoading && chatMessages.length === 0 && !viewStreaming && (
             <EmptyState
               name={firstName}
               greeting={greeting.current}
-              suggestions={suggestions}
+              prompts={prompts}
               onAsk={ask}
             />
           )}
 
           {chatMessages.map((msg, i) => {
             const isStreaming =
-              loading &&
+              viewStreaming &&
               msg.role === "Assistant" &&
               i === chatMessages.length - 1;
             return (
@@ -532,7 +638,7 @@ export default function Dashboard() {
             );
           })}
 
-          {loading &&
+          {viewStreaming &&
             chatMessages[chatMessages.length - 1]?.role !== "Assistant" && (
               <TypingDots />
             )}
@@ -548,7 +654,7 @@ export default function Dashboard() {
             onChange={setQuery}
             onSubmit={() => ask()}
             onStop={stop}
-            loading={loading}
+            loading={viewStreaming}
             placeholder={activeId ? "Ask a follow-up…" : "Ask anything…"}
             inputRef={chatInputRef}
           />
@@ -576,6 +682,13 @@ export default function Dashboard() {
         </kbd>
         <span>toggle sidebar</span>
       </div>
+
+      {/* Completion notifications */}
+      <AnswerNotification
+        toasts={toasts}
+        onView={viewToast}
+        onDismiss={dismissToast}
+      />
     </div>
   );
 }
