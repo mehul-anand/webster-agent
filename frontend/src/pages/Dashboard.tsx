@@ -321,6 +321,17 @@ export default function Dashboard() {
         },
       );
 
+      if (!response.ok) {
+        let message = `Request failed (${response.status})`;
+        try {
+          const body = await response.json();
+          if (body?.error) message = body.error;
+        } catch {
+          // non-JSON error body, keep the generic message
+        }
+        throw new Error(message);
+      }
+
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
