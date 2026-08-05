@@ -76,7 +76,7 @@ export function EmptyState({
         )}
 
         <div
-          className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs"
+          className="mt-8 hidden flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs md:flex"
           style={{ color: "var(--text-muted)" }}
         >
           <span className="flex items-center gap-1.5">
@@ -88,7 +88,7 @@ export function EmptyState({
                 color: "var(--text-secondary)",
               }}
             >
-              ⌘⇧F
+              ⌘⇧F / Ctrl+Shift+F
             </kbd>
             search chats
           </span>

@@ -2,13 +2,23 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { Check, Copy } from "lucide-react";
-import { useState } from "react";
+import { isValidElement, useState } from "react";
 import { ExternalLink } from "./ExternalLink";
 import { SourcePill } from "./SourcePill";
 import { parseAssistantContent } from "@/lib/parseAssistantContent";
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractText(node: React.ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (isValidElement(node)) {
+    return extractText((node.props as { children?: React.ReactNode }).children);
+  }
+  return "";
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -39,6 +49,29 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function CodeCopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+  return (
+    <button
+      onClick={copy}
+      title={copied ? "Copied" : "Copy code"}
+      className="absolute right-2 top-2 rounded p-1 transition-colors hover:bg-[var(--bg-hover)]"
+      style={{ color: "var(--text-muted)" }}
+    >
+      {copied ? (
+        <Check className="size-3.5" style={{ color: "var(--text-link)" }} />
+      ) : (
+        <Copy className="size-3.5" />
+      )}
+    </button>
+  );
+}
+
 export function AssistantMessage({
   content,
   streaming,
@@ -58,6 +91,11 @@ export function AssistantMessage({
         '<mark style="background:var(--highlight);border-radius:2px;color:inherit">$1</mark>',
       )
     : answer;
+
+  const followUpsPending =
+    streaming &&
+    content.includes("</ANSWER>") &&
+    !content.includes("<FOLLOW_UPS>");
 
   return (
     <div className="space-y-3">
@@ -92,19 +130,25 @@ export function AssistantMessage({
             a: ({ href, children }) => (
               <ExternalLink href={href}>{children}</ExternalLink>
             ),
-            pre: ({ children }) => (
-              <pre
-                className="overflow-x-auto border"
-                style={{
-                  background: "var(--bg-surface)",
-                  borderColor: "var(--border)",
-                  borderRadius: "12px",
-                  padding: "0.9rem 1rem",
-                }}
-              >
-                {children}
-              </pre>
-            ),
+            pre: ({ children }) => {
+              const codeText = extractText(children);
+              return (
+                <div className="relative">
+                  <pre
+                    className="overflow-x-auto border"
+                    style={{
+                      background: "var(--bg-surface)",
+                      borderColor: "var(--border)",
+                      borderRadius: "12px",
+                      padding: "0.9rem 1rem",
+                    }}
+                  >
+                    {children}
+                  </pre>
+                  {codeText && <CodeCopyButton text={codeText} />}
+                </div>
+              );
+            },
           }}
         >
           {highlighted}
@@ -131,7 +175,7 @@ export function AssistantMessage({
         </div>
       )}
 
-      {followUps.length > 0 && (
+      {followUps.length > 0 ? (
         <div className="flex flex-wrap gap-1.5 pt-1">
           {followUps.map((q, i) => (
             <button
@@ -148,7 +192,21 @@ export function AssistantMessage({
             </button>
           ))}
         </div>
-      )}
+      ) : followUpsPending ? (
+        <div
+          className="flex items-center gap-2 pt-1 text-xs"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <span
+            className="inline-block size-3 animate-spin rounded-full border"
+            style={{
+              borderColor: "var(--border)",
+              borderTopColor: "var(--text-muted)",
+            }}
+          />
+          Generating follow-ups…
+        </div>
+      ) : null}
 
       <CopyButton text={answer} />
     </div>

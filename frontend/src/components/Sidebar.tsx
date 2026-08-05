@@ -64,7 +64,9 @@ export function Sidebar({
       c.slug.toLowerCase().includes(term) ||
       c.messages[0]?.content?.toLowerCase().includes(term),
   );
-  const pendingStreams = streaming.filter((s) => s.convId === null);
+  const pendingStreams = streaming.filter(
+    (s) => s.convId === null || !conversations.some((c) => c.id === s.convId),
+  );
   const streamingIds = new Set(
     streaming.map((s) => s.convId).filter((v): v is string => v !== null),
   );
@@ -123,7 +125,7 @@ export function Sidebar({
               <SidebarBtn
                 icon={<Search />}
                 label="Search chats"
-                hint="⌘⇧F"
+                hint="⌘⇧F / Ctrl+Shift+F"
                 onClick={() => {
                   onToggleSearch();
                   setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -270,7 +272,7 @@ export function Sidebar({
                 <Plus />
               </IconBtn>
               <IconBtn
-                title="Search (⌘⇧F)"
+                title="Search (⌘⇧F / Ctrl+Shift+F)"
                 onClick={() => {
                   onToggle();
                   setTimeout(() => searchInputRef.current?.focus(), 100);
