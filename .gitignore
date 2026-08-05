@@ -5,3 +5,5 @@ backend/node_modules/
 backend/generated/
 test/
 .DS_Store
+old_version/
+new_version/

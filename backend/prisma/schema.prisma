@@ -48,3 +48,13 @@ model Message {
 
   createdAt      DateTime       @default(now())
 }
+
+model RateLimit {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  dailyCount Int      @default(0)
+  dailyReset DateTime
+  burstCount Int      @default(0)
+  burstReset DateTime
+  updatedAt  DateTime @updatedAt
+}
