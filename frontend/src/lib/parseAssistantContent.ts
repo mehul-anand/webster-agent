@@ -13,7 +13,9 @@ export function parseAssistantContent(raw: string) {
           if (url) sources.push(url);
         });
       }
-    } catch {}
+    } catch {
+      // ignore malformed JSON sources
+    }
     content = content.replace(sourcesMatch[0], "").trim();
   }
 

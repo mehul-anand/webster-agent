@@ -3,46 +3,27 @@ import type { User } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { ThemePicker } from "@/components/ThemePicker";
-import { AssistantMessage } from "@/components/AssistantMessage";
+import { Menu, Search } from "lucide-react";
+import { Sidebar } from "@/components/Sidebar";
+import { ChatMessage } from "@/components/ChatMessage";
+import { InputBar } from "@/components/InputBar";
+import { EmptyState } from "@/components/EmptyState";
+import { FindBar } from "@/components/FindBar";
 import { TypingDots } from "@/components/TypingDots";
-import { SidebarBtn } from "@/components/SidebarBtn";
-import { IconBtn } from "@/components/IconBtn";
-import { PlusIcon, SearchIcon, PaletteIcon, LogoutIcon } from "@/components/Icons";
 import type { Message, Conversation } from "@/types/dashboard";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 
 const supabase = createClient();
-
-function killWordBackward(value: string, cursor: number): [string, number] {
-  const before = value.slice(0, cursor);
-  const after = value.slice(cursor);
-  let i = before.length - 1;
-  while (i >= 0 && before[i] === " ") i--;
-  while (i >= 0 && before[i] !== " ") i--;
-  const newBefore = before.slice(0, i + 1);
-  return [newBefore + after, newBefore.length];
-}
-
-function escapeRegex(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function highlightText(text: string, term: string, style: React.CSSProperties): React.ReactNode {
-  if (!term) return text;
-  const parts = text.split(new RegExp(`(${escapeRegex(term)})`, "gi"));
-  return parts.map((part, i) =>
-    part.toLowerCase() === term.toLowerCase()
-      ? <span key={i} style={style}>{part}</span>
-      : part
-  );
-}
 
 async function getJwt() {
   const {
     data: { session },
   } = await supabase.auth.getSession();
   return session?.access_token;
+}
+
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export default function Dashboard() {
@@ -75,7 +56,7 @@ export default function Dashboard() {
   const streamBufferRef = useRef("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const findInputRef = useRef<HTMLInputElement>(null);
   const findOpenRef = useRef(findOpen);
   findOpenRef.current = findOpen;
@@ -91,6 +72,12 @@ export default function Dashboard() {
     "Got a question, {name}?",
   ];
   const greeting = useRef(greetings[Math.floor(Math.random() * greetings.length)]);
+  const suggestions = [
+    "What's the latest in AI this week?",
+    "Explain quantum computing simply",
+    "Best practices for React performance",
+    "Compare Claude vs GPT-4",
+  ];
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -197,7 +184,6 @@ export default function Dashboard() {
     } else {
       setSearchParams({}, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, setSearchParams]);
 
   async function selectConversation(id: string) {
@@ -295,8 +281,8 @@ export default function Dashboard() {
           ];
         });
       }
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
+    } catch (err) {
+      if (err instanceof Error && err.name !== "AbortError") {
         setChatMessages((prev) => [
           ...prev,
           {
@@ -323,15 +309,6 @@ export default function Dashboard() {
     setUser(null);
     navigate("/");
   }
-
-  const filteredConversations = conversations.filter((c) => {
-    const term = search.toLowerCase();
-    return (
-      c.title?.toLowerCase().includes(term) ||
-      c.slug.toLowerCase().includes(term) ||
-      c.messages[0]?.content?.toLowerCase().includes(term)
-    );
-  });
 
   const totalMatches = useMemo(() => {
     if (!findText) return 0;
@@ -402,7 +379,7 @@ export default function Dashboard() {
       >
         <button
           onClick={() => navigate("/auth")}
-          className="px-6 py-3 rounded-xl border text-sm font-medium transition-opacity hover:opacity-80"
+          className="rounded-xl border px-6 py-3 text-sm font-medium transition-opacity hover:opacity-80"
           style={{
             background: "var(--bg-surface)",
             borderColor: "var(--border)",
@@ -415,357 +392,104 @@ export default function Dashboard() {
     );
   }
 
+  const firstName = user.user_metadata.full_name?.split(" ")[0] || "there";
+  const activeTitle = conversations.find((c) => c.id === activeId)?.title;
+
   return (
     <div
       className="flex h-screen overflow-hidden"
       style={{ background: "var(--bg)", color: "var(--text-primary)" }}
     >
       {/* ── Sidebar ── */}
-      {isMobile && sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 transition-opacity"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-      <aside
-        className={`flex flex-col shrink-0 border-r transition-all duration-200 ${
-          isMobile
-            ? `fixed inset-y-0 left-0 z-50 w-72 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`
-            : "relative"
-        }`}
-        style={{
-          width: isMobile ? undefined : (sidebarOpen ? "17rem" : "3rem"),
-          borderColor: "var(--border)",
-          background: "var(--bg-surface)",
+      <Sidebar
+        open={sidebarOpen}
+        isMobile={isMobile}
+        userName={user.user_metadata.full_name}
+        conversations={conversations}
+        activeId={activeId}
+        search={search}
+        searchOpen={searchOpen}
+        themePickerOpen={themePickerOpen}
+        conversationsLoading={conversationsLoading}
+        onNewChat={newChat}
+        onSelect={(id) => {
+          selectConversation(id);
+          if (isMobile) setSidebarOpen(false);
         }}
-      >
-        <div
-          className="flex items-center justify-between h-12 px-2 border-b shrink-0"
-          style={{ borderColor: "var(--border)" }}
-        >
-          {sidebarOpen && (
-            <span
-              className="truncate text-xs px-1 flex-1"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {user.user_metadata.full_name}
-            </span>
-          )}
-          <button
-            onClick={() => setSidebarOpen((v) => !v)}
-            className="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70 shrink-0"
-            style={{ color: "var(--text-muted)" }}
-            title={isMobile ? "Close" : (sidebarOpen ? "Collapse (\\)" : "Expand (\\")}
-          >
-            {isMobile || sidebarOpen ? (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M4 4l8 8M12 4l-8 8"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M6 3l5 5-5 5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
-          </button>
-        </div>
-
-        {sidebarOpen ? (
-          <>
-            <div className="p-2 space-y-1 shrink-0">
-              <SidebarBtn
-                icon={<PlusIcon />}
-                label="New chat"
-                active={activeId === null}
-                onClick={newChat}
-              />
-              <SidebarBtn
-                icon={<SearchIcon />}
-                label="Search chats"
-                hint="⌘⇧F"
-                onClick={() => {
-                  setSearchOpen((v) => !v);
-                  setTimeout(() => searchInputRef.current?.focus(), 50);
-                }}
-              />
-              {searchOpen && (
-                <input
-                  ref={searchInputRef}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "w") {
-                      e.preventDefault();
-                      const el = e.currentTarget;
-                      const start = el.selectionStart ?? search.length;
-                      const [newValue, newCursor] = killWordBackward(search, start);
-                      setSearch(newValue);
-                      setTimeout(() => el.setSelectionRange(newCursor, newCursor), 0);
-                    }
-                  }}
-                  placeholder="Filter conversations…"
-                  className="w-full px-3 py-1.5 rounded-lg text-sm outline-none"
-                  style={{
-                    background: "var(--bg-input)",
-                    border: "1px solid var(--border-input)",
-                    color: "var(--text-primary)",
-                  }}
-                />
-              )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
-              {conversationsLoading && filteredConversations.length === 0 && (
-                <div className="space-y-3 px-3 py-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="animate-pulse space-y-1.5">
-                      <div className="h-3 rounded w-3/4" style={{ background: "var(--bg-active)" }} />
-                      <div className="h-2 rounded w-1/2" style={{ background: "var(--bg-active)" }} />
-                    </div>
-                  ))}
-                </div>
-              )}
-              {!conversationsLoading && filteredConversations.length === 0 && !search && (
-                <p
-                  className="text-xs px-3 py-4 text-center"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  No conversations yet
-                </p>
-              )}
-              {filteredConversations.length === 0 && search && (
-                <p
-                  className="text-xs px-3 py-4 text-center"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  No matches
-                </p>
-              )}
-              {filteredConversations.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    selectConversation(c.id);
-                    if (isMobile) setSidebarOpen(false);
-                  }}
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm transition-colors"
-                  style={{
-                    background:
-                      activeId === c.id ? "var(--bg-active)" : "transparent",
-                    color:
-                      activeId === c.id
-                        ? "var(--text-primary)"
-                        : "var(--text-secondary)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (activeId !== c.id)
-                      (e.currentTarget as HTMLElement).style.background =
-                        "var(--bg-hover)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (activeId !== c.id)
-                      (e.currentTarget as HTMLElement).style.background =
-                        "transparent";
-                  }}
-                >
-                  <div className="truncate font-medium text-sm">
-                    {c.title || c.slug}
-                  </div>
-                  <div
-                    className="truncate text-xs mt-0.5"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    {(() => {
-                      const raw = c.messages[0]?.content ?? "";
-                      const match = raw.match(/<ANSWER>([\s\S]*?)<\/ANSWER>/);
-                      const clean = match
-                        ? match[1].trim()
-                        : raw.replace(/<[^>]+>/g, "").trim();
-                      return (
-                        clean.slice(0, 55) || `${c._count.messages} messages`
-                      );
-                    })()}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div
-              className="relative px-3 py-4 shrink-0 space-y-1"
-              style={{ borderColor: "var(--border)" }}
-            >
-              {themePickerOpen && (
-                <ThemePicker onClose={() => setThemePickerOpen(false)} />
-              )}
-              <SidebarBtn
-                icon={<PaletteIcon />}
-                label="Theme"
-                onClick={() => setThemePickerOpen((v) => !v)}
-              />
-              <SidebarBtn
-                icon={<LogoutIcon />}
-                label="Logout"
-                danger
-                onClick={logout}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-col items-center gap-1 pt-2">
-              <IconBtn title="New chat" onClick={newChat}>
-                <PlusIcon />
-              </IconBtn>
-              <IconBtn
-                title="Search (⌘⇧F)"
-                onClick={() => {
-                  setSidebarOpen(true);
-                  setSearchOpen(true);
-                  setTimeout(() => searchInputRef.current?.focus(), 100);
-                }}
-              >
-                <SearchIcon />
-              </IconBtn>
-            </div>
-            <div className="flex-1" />
-            <div className="flex flex-col items-center gap-1 pb-2">
-              <IconBtn
-                title="Theme"
-                onClick={() => {
-                  setSidebarOpen(true);
-                  setThemePickerOpen(true);
-                }}
-              >
-                <PaletteIcon />
-              </IconBtn>
-            </div>
-          </>
-        )}
-      </aside>
+        onClose={() => setSidebarOpen(false)}
+        onToggle={() => setSidebarOpen((v) => !v)}
+        onSearchChange={setSearch}
+        onToggleSearch={() => setSearchOpen((v) => !v)}
+        onToggleThemePicker={() => setThemePickerOpen((v) => !v)}
+        onOpenThemePicker={() => setThemePickerOpen(true)}
+        onLogout={logout}
+        searchInputRef={searchInputRef}
+      />
 
       {/* ── Main ── */}
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col">
         {isMobile && !sidebarOpen && (
           <div
-            className="flex items-center h-12 px-3 border-b shrink-0"
+            className="flex h-12 shrink-0 items-center border-b px-3"
             style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}
           >
             <button
               onClick={() => setSidebarOpen(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70 shrink-0"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md transition-opacity hover:opacity-70"
               style={{ color: "var(--text-muted)" }}
             >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+              <Menu className="size-5" />
             </button>
-            <span className="text-sm font-medium ml-2 flex-1 truncate" style={{ color: "var(--text-primary)" }}>
-              {activeId
-                ? (conversations.find((c) => c.id === activeId)?.title || "Chat")
-                : "Webster"}
+            <span
+              className="ml-2 flex-1 truncate text-sm font-medium"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {activeId ? activeTitle || "Chat" : "Webster"}
             </span>
             <button
               onClick={() => setFindOpen((v) => !v)}
-              className="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70 shrink-0 ml-auto"
+              className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-md transition-opacity hover:opacity-70"
               style={{ color: "var(--text-muted)" }}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="6.5" cy="6.5" r="4" stroke="currentColor" strokeWidth="1.3" />
-                <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-              </svg>
+              <Search className="size-4" />
             </button>
           </div>
         )}
+
         {activeId && !chatLoading && (
           <div
-            className="shrink-0 px-4 py-2.5 border-b text-center"
+            className="shrink-0 border-b px-4 py-2.5 text-center"
             style={{ borderColor: "var(--border)", background: "var(--bg)" }}
           >
-            <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-              {conversations.find((c) => c.id === activeId)?.title || "Chat"}
+            <span
+              className="text-sm font-medium"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {activeTitle || "Chat"}
             </span>
           </div>
         )}
+
         {findOpen && (
-          <div
-            className="shrink-0 flex items-center gap-2 px-4 py-2 border-b"
-            style={{ borderColor: "var(--border)", background: "var(--bg)" }}
-          >
-            <input
-              ref={findInputRef}
-              value={findText}
-              onChange={(e) => {
-                setFindText(e.target.value);
-                setFindMatchIndex(0);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  if (e.shiftKey) goFindPrev();
-                  else goFindNext();
-                }
-                if ((e.metaKey || e.ctrlKey) && e.key === "w") {
-                  e.preventDefault();
-                  const el = e.currentTarget;
-                  const start = el.selectionStart ?? findText.length;
-                  const [newValue, newCursor] = killWordBackward(findText, start);
-                  setFindText(newValue);
-                  setTimeout(() => el.setSelectionRange(newCursor, newCursor), 0);
-                }
-              }}
-              placeholder="Find in chat…"
-              className="flex-1 px-3 py-1.5 rounded-lg text-sm outline-none"
-              style={{
-                background: "var(--bg-input)",
-                border: "1px solid var(--border-input)",
-                color: "var(--text-primary)",
-              }}
-            />
-            <span className="text-xs tabular-nums min-w-8 text-right" style={{ color: "var(--text-muted)" }}>
-              {findText ? `${findMatchIndex + 1}/${totalMatches}` : ""}
-            </span>
-            <button
-              onClick={goFindPrev}
-              disabled={!findText || totalMatches === 0}
-              className="p-1 rounded transition-opacity hover:opacity-70 disabled:opacity-20"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M10 10L7 7 4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <button
-              onClick={goFindNext}
-              disabled={!findText || totalMatches === 0}
-              className="p-1 rounded transition-opacity hover:opacity-70 disabled:opacity-20"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M4 4L7 7 10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <button
-              onClick={() => { setFindOpen(false); setFindText(""); }}
-              className="p-1 rounded transition-opacity hover:opacity-70"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M4 4l6 6M10 4l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
+          <FindBar
+            findText={findText}
+            totalMatches={totalMatches}
+            findMatchIndex={findMatchIndex}
+            onFindTextChange={(v) => {
+              setFindText(v);
+              setFindMatchIndex(0);
+            }}
+            onPrev={goFindPrev}
+            onNext={goFindNext}
+            onClose={() => {
+              setFindOpen(false);
+              setFindText("");
+            }}
+            inputRef={findInputRef}
+          />
         )}
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+
+        <div className="flex-1 space-y-6 overflow-y-auto px-4 py-6">
           {chatLoading && (
             <div className="flex h-full items-center justify-center">
               <div className="flex items-center gap-2">
@@ -783,19 +507,12 @@ export default function Dashboard() {
             </div>
           )}
           {!chatLoading && chatMessages.length === 0 && !loading && (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center space-y-2">
-                <p
-                  className="text-2xl font-medium"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  {greeting.current.replace("{name}", user.user_metadata.full_name?.split(" ")[0] || "there")}
-                </p>
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  Powered by web search + AI
-                </p>
-              </div>
-            </div>
+            <EmptyState
+              name={firstName}
+              greeting={greeting.current}
+              suggestions={suggestions}
+              onAsk={ask}
+            />
           )}
 
           {chatMessages.map((msg, i) => {
@@ -804,34 +521,14 @@ export default function Dashboard() {
               msg.role === "Assistant" &&
               i === chatMessages.length - 1;
             return (
-              <div
+              <ChatMessage
                 key={msg.id}
-                data-msg-id={msg.id}
-                className={`flex ${msg.role === "User" ? "justify-end" : "justify-start"}`}
-              >
-                {msg.role === "User" ? (
-                  <div
-                    className="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm whitespace-pre-wrap"
-                    style={{
-                      background: "var(--bg-user-msg)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {findText && !loading
-                      ? highlightText(msg.content, findText, { background: "var(--highlight)", borderRadius: "2px" })
-                      : msg.content}
-                  </div>
-                ) : (
-                  <div className="max-w-[90%] md:max-w-[80%]">
-                    <AssistantMessage
-                      content={msg.content}
-                      streaming={isStreaming}
-                      onFollowUp={ask}
-                      highlight={findText}
-                    />
-                  </div>
-                )}
-              </div>
+                msg={msg}
+                streaming={isStreaming}
+                onFollowUp={ask}
+                highlight={findText}
+                userName={user.user_metadata.full_name}
+              />
             );
           })}
 
@@ -846,62 +543,21 @@ export default function Dashboard() {
           className="border-t px-4 py-4"
           style={{ borderColor: "var(--border)", background: "var(--bg)" }}
         >
-          <div className="max-w-3xl mx-auto flex gap-2">
-            <input
-              ref={chatInputRef}
-              className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none transition-colors"
-              style={{
-                background: "var(--bg-input)",
-                border: "1px solid var(--border-input)",
-                color: "var(--text-primary)",
-              }}
-              placeholder={activeId ? "Ask a follow-up…" : "Ask anything…"}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !(e.metaKey || e.ctrlKey)) ask();
-                if ((e.metaKey || e.ctrlKey) && e.key === "w") {
-                  e.preventDefault();
-                  const el = e.currentTarget;
-                  const start = el.selectionStart ?? query.length;
-                  const [newValue, newCursor] = killWordBackward(query, start);
-                  setQuery(newValue);
-                  setTimeout(() => el.setSelectionRange(newCursor, newCursor), 0);
-                }
-              }}
-            />
-            {loading ? (
-              <button
-                onClick={stop}
-                className="px-4 py-2.5 rounded-xl border text-sm transition-opacity hover:opacity-70"
-                style={{
-                  borderColor: "var(--border)",
-                  color: "var(--text-muted)",
-                  background: "var(--bg-input)",
-                }}
-              >
-                Stop
-              </button>
-            ) : (
-              <button
-                onClick={() => ask()}
-                disabled={!query.trim()}
-                className="px-4 py-2.5 rounded-xl text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
-                style={{
-                  background: "var(--bg-ask-btn)",
-                  color: "var(--text-ask-btn)",
-                }}
-              >
-                Ask
-              </button>
-            )}
-          </div>
+          <InputBar
+            value={query}
+            onChange={setQuery}
+            onSubmit={() => ask()}
+            onStop={stop}
+            loading={loading}
+            placeholder={activeId ? "Ask a follow-up…" : "Ask anything…"}
+            inputRef={chatInputRef}
+          />
         </div>
       </div>
 
       {/* \ shortcut tooltip */}
       <div
-        className="fixed bottom-4 right-4 z-50 hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs pointer-events-none select-none"
+        className="fixed bottom-4 right-4 z-50 hidden items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs pointer-events-none select-none md:flex"
         style={{
           background: "var(--bg-surface)",
           borderColor: "var(--border)",
@@ -909,7 +565,7 @@ export default function Dashboard() {
         }}
       >
         <kbd
-          className="font-mono px-1 py-0.5 rounded text-[10px] border"
+          className="rounded border px-1 py-0.5 font-mono text-[10px]"
           style={{
             borderColor: "var(--border)",
             background: "var(--bg-input)",

@@ -1,3 +1,4 @@
+import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function ExternalLink({
@@ -13,9 +14,10 @@ export function ExternalLink({
       target="_blank"
       rel="noopener noreferrer"
       style={{ color: "var(--text-link)" }}
-      className="underline underline-offset-2 break-all hover:opacity-80 transition-opacity"
+      className="inline-flex items-center gap-0.5 break-all underline underline-offset-2 transition-opacity hover:opacity-80"
     >
       {children}
+      <ArrowUpRight className="size-3 shrink-0" />
     </a>
   );
 }

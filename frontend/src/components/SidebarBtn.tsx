@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 export function SidebarBtn({
   icon,
@@ -18,32 +19,26 @@ export function SidebarBtn({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+      className={cn(
+        "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+        danger
+          ? "hover:text-red-500"
+          : "hover:bg-[var(--bg-hover)]",
+        active && "bg-[var(--bg-active)]",
+      )}
       style={{
         color: danger
           ? "var(--text-muted)"
           : active
             ? "var(--text-primary)"
             : "var(--text-secondary)",
-        background: active ? "var(--bg-active)" : "transparent",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-        if (danger) (e.currentTarget as HTMLElement).style.color = "#ef4444";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.background = active
-          ? "var(--bg-active)"
-          : "transparent";
-        if (danger)
-          (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
       }}
     >
       {icon}
-      <span>{label}</span>
+      <span className={cn(hint && "min-w-0 flex-1 truncate")}>{label}</span>
       {hint && (
         <span
-          className="ml-auto text-xs hidden md:inline"
+          className="ml-auto hidden shrink-0 whitespace-nowrap text-xs md:inline"
           style={{ color: "var(--text-muted)" }}
         >
           {hint}

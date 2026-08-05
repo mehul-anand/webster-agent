@@ -13,7 +13,7 @@ export function IconBtn({
     <button
       onClick={onClick}
       title={title}
-      className="flex items-center justify-center w-8 h-8 rounded-md transition-opacity hover:opacity-70"
+      className="flex size-8 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-hover)]"
       style={{ color: "var(--text-muted)" }}
     >
       {children}

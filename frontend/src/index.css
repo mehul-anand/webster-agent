@@ -128,4 +128,41 @@
   html {
     @apply font-sans;
     }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 8px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--border-input);
+  }
+}
+
+.prose :where(code):not(:where(pre code)) {
+  background: var(--bg-active);
+  padding: 0.15em 0.4em;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.prose pre code {
+  font-size: 0.85em;
+}
+
+.prose :where(blockquote) {
+  font-style: italic;
+}
+
+.prose :where(table) {
+  font-size: 0.875em;
 }

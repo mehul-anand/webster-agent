@@ -1,8 +1,12 @@
-export function SourcePill({ url }: { url: string }) {
+import { ArrowUpRight } from "lucide-react";
+
+export function SourcePill({ url, index }: { url: string; index: number }) {
   let display = url;
   try {
     display = new URL(url).hostname.replace("www.", "");
-  } catch {}
+  } catch {
+    // keep raw url as fallback
+  }
   return (
     <a
       href={url}
@@ -13,24 +17,19 @@ export function SourcePill({ url }: { url: string }) {
         borderColor: "var(--pill-border)",
         color: "var(--pill-text)",
       }}
-      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs hover:opacity-80 transition-opacity"
+      className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors hover:border-[var(--pill-border)] hover:opacity-80"
     >
-      <span className="truncate max-w-[160px]">{display}</span>
-      <svg
-        width="10"
-        height="10"
-        viewBox="0 0 10 10"
-        fill="none"
-        className="shrink-0 opacity-50"
+      <span
+        className="flex size-4 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+        style={{
+          background: "var(--bg-active)",
+          color: "var(--text-secondary)",
+        }}
       >
-        <path
-          d="M2 8L8 2M8 2H4M8 2V6"
-          stroke="currentColor"
-          strokeWidth="1.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+        {index}
+      </span>
+      <span className="max-w-[160px] truncate">{display}</span>
+      <ArrowUpRight className="size-3 shrink-0 opacity-50" />
     </a>
   );
 }

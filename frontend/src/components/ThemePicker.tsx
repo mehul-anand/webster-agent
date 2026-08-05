@@ -1,3 +1,4 @@
+import { Moon, Sun } from "lucide-react";
 import { THEMES } from "../lib/theme.ts";
 import type { ThemeMode } from "../lib/theme.ts";
 import { useTheme } from "@/context/ThemeContext";
@@ -7,41 +8,44 @@ export function ThemePicker({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="absolute bottom-14 left-2 z-50 rounded-xl border p-4 w-64 shadow-xl"
+      className="absolute bottom-14 left-2 z-50 w-64 rounded-xl border p-4 shadow-xl"
       style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}
     >
-      {/* Mode toggle */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <span
-          className="text-xs font-medium flex-1"
+          className="flex-1 text-xs font-medium"
           style={{ color: "var(--text-secondary)" }}
         >
           Mode
         </span>
         <div
-          className="flex rounded-lg overflow-hidden border"
+          className="flex overflow-hidden rounded-lg border"
           style={{ borderColor: "var(--border)" }}
         >
           {(["light", "dark"] as ThemeMode[]).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
-              className="px-3 py-1 text-xs transition-colors capitalize"
+              className="flex items-center gap-1.5 px-3 py-1 text-xs transition-colors capitalize"
               style={{
                 background:
                   mode === m ? "var(--bg-ask-btn)" : "var(--bg-input)",
                 color: mode === m ? "var(--text-ask-btn)" : "var(--text-muted)",
               }}
             >
-              {m === "light" ? "☀️ Light" : "🌙 Dark"}
+              {m === "light" ? (
+                <Sun className="size-3.5" />
+              ) : (
+                <Moon className="size-3.5" />
+              )}
+              {m}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Theme grid */}
       <p
-        className="text-xs font-medium mb-2"
+        className="mb-2 text-xs font-medium"
         style={{ color: "var(--text-secondary)" }}
       >
         Theme
@@ -51,7 +55,7 @@ export function ThemePicker({ onClose }: { onClose: () => void }) {
           <button
             key={t.name}
             onClick={() => setTheme(t)}
-            className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-left border transition-all"
+            className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition-all"
             style={{
               background:
                 activeTheme.name === t.name
@@ -72,7 +76,7 @@ export function ThemePicker({ onClose }: { onClose: () => void }) {
 
       <button
         onClick={onClose}
-        className="mt-3 w-full text-xs py-1 rounded-lg transition-opacity hover:opacity-70"
+        className="mt-3 w-full rounded-lg py-1 text-xs transition-opacity hover:opacity-70"
         style={{ color: "var(--text-muted)", background: "var(--bg-hover)" }}
       >
         Close
