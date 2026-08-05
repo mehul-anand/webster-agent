@@ -177,6 +177,14 @@ npm test
 
 ---
 
+## Deployment
+
+- **Frontend** — Vercel (root directory `frontend`, Vite). Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_BACKEND_URL` (no trailing slash) **before** the first build; Vite inlines `VITE_*` at build time.
+- **Backend** — Render (root directory `backend`, Node 22). Build: `npm install && npx prisma generate`; start: `npm start`. Env: `DATABASE_URL` (Supabase transaction pooler), `SUPABASE_URL`, `SUPABASE_API_SECRET`, `OPENAI_API_KEY`, `TAVILY_API_KEY`, `RATE_LIMIT_DAILY`, `RATE_LIMIT_PER_MIN`. Set `CORS_ORIGIN` to the Vercel URL.
+- **Keep-alive** — Render's free tier spins the backend down after 15 minutes idle (first request then waits ~30s to boot). `GET /health` returns `200 {"status":"ok"}` and exists only so an external monitor can keep the instance warm. **UptimeRobot** (free) monitors `https://<render-url>/health` every 5 minutes; the requests reset the idle timer. Don't delete `/health` or the monitor — the app depends on both.
+
+---
+
 <!-- ## Screenshots -->
 
 <!-- TODO: Add screenshots -->
