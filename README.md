@@ -12,6 +12,7 @@ A full-stack, web-search-augmented AI chat application. User queries are answere
 - **Follow-up questions** — the model generates suggested follow-ups after each answer; clicking one replays the full conversation history for context continuity
 - **Auth** — Google and GitHub OAuth via Supabase; JWT validated on every backend request
 - **Conversation persistence** — all conversations and messages stored in PostgreSQL via Prisma; active conversation synced to URL (`?id=...`) for deep-linking
+- **Per-user rate limiting** — DB-backed fixed-window limits (daily + per-minute) protect API spend; breaches return HTTP 429
 - **Themes** — 6 handcrafted themes (Default, Amethyst, Kodama, Cosmic, Amber, Solar Dusk), each with light and dark variants, applied via CSS custom properties and persisted to localStorage
 
 ---
@@ -46,8 +47,8 @@ Frontend (Vite + React SPA)
                                       ├── GET /conversations
                                       ├── GET /conversation/:id
                                       │
-                                      └── Prisma ORM ──> PostgreSQL
-                                           (User, Conversation, Message)
+                                       └── Prisma ORM ──> PostgreSQL
+                                            (User, Conversation, Message, RateLimit)
 ```
 
 ### Data flow
@@ -84,6 +85,9 @@ The `/follow-up` endpoint replays the full message history as prior context in t
 **URL-based conversation state**
 The active conversation ID is synced to URL search params (`?id=...`) and restored on page load, enabling shareable and deep-linkable conversations.
 
+**DB-backed per-user rate limiting**
+The `RateLimit` model stores per-user counters for a fixed-window daily cap and a per-minute burst cap. Both `/webster/ask` and `/webster/follow-up` increment the counters inside a Prisma `$transaction`, so the check stays correct even when several streams run in parallel; over-limit requests get a `429`. Limits are tunable via `RATE_LIMIT_DAILY` / `RATE_LIMIT_PER_MIN` and are read at server startup.
+
 ---
 
 ## Tech Stack
@@ -99,6 +103,7 @@ The active conversation ID is synced to URL search params (`?id=...`) and restor
 | Search | Tavily API (advanced web search) |
 | Routing | react-router-dom 7 |
 | Markdown | react-markdown, remark-gfm, rehype-raw |
+| Testing | Vitest (unit) — backend + frontend |
 
 ---
 
@@ -106,7 +111,7 @@ The active conversation ID is synced to URL search params (`?id=...`) and restor
 
 ### Prerequisites
 
-- Node.js
+- Node.js 20.11+
 - PostgreSQL database
 - Supabase project (for OAuth)
 - OpenAI API key
@@ -119,17 +124,23 @@ The active conversation ID is synced to URL search params (`?id=...`) and restor
 ```env
 DATABASE_URL=your_postgresql_connection_string
 SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_API_SECRET=your_supabase_api_secret
 OPENAI_API_KEY=your_openai_api_key
 TAVILY_API_KEY=your_tavily_api_key
+
+# optional — defaults shown
+CORS_ORIGIN=http://localhost:5173
+RATE_LIMIT_DAILY=50
+RATE_LIMIT_PER_MIN=10
+# PORT=3001
 ```
 
 **Frontend** — create `.env` in `/frontend`:
 
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
-<!-- VITE_SUPABASE_ANON_KEY=your_supabase_anon_key -->
-VITE_API_URL=http://localhost:3001
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+VITE_BACKEND_URL=http://localhost:3001
 ```
 
 ### Running Locally
@@ -138,9 +149,9 @@ VITE_API_URL=http://localhost:3001
 # Backend
 cd backend
 npm install
-npx prisma generate
-npx prisma migrate deploy
-npm run dev
+npm run prisma:generate
+npm run prisma:migrate
+npm start
 
 # Frontend (separate terminal)
 cd frontend
@@ -149,6 +160,20 @@ npm run dev
 ```
 
 Frontend runs on `http://localhost:5173`, backend on `http://localhost:3001`.
+
+### Running Tests
+
+```bash
+# Backend
+cd backend
+npm test
+
+# Frontend
+cd frontend
+npm test
+```
+
+31 Vitest unit tests cover the rate-limit window logic, the assistant-content parser, and the `utils` helpers.
 
 ---
 
