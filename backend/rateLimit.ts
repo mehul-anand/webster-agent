@@ -1,20 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
 import { prisma } from "./db";
+import { evolveCounters, isOverLimit, startOfDay, startOfMinute } from "./rateLimitCore";
 
 const DAILY_LIMIT = Number(process.env.RATE_LIMIT_DAILY) || 50;
 const BURST_LIMIT = Number(process.env.RATE_LIMIT_PER_MIN) || 10;
-
-function startOfDay(d: Date) {
-  const copy = new Date(d);
-  copy.setUTCHours(0, 0, 0, 0);
-  return copy;
-}
-
-function startOfMinute(d: Date) {
-  const copy = new Date(d);
-  copy.setUTCSeconds(0, 0);
-  return copy;
-}
 
 export async function rateLimit(
   req: Request,
@@ -48,21 +37,15 @@ export async function rateLimit(
         });
       }
 
-      const dayStale = existing.dailyReset < dayWindow;
-      const burstStale = existing.burstReset < burstWindow;
+      const next = evolveCounters(existing, dayWindow, burstWindow);
 
       return tx.rateLimit.update({
         where: { id: existing.id },
-        data: {
-          dailyCount: dayStale ? 1 : existing.dailyCount + 1,
-          dailyReset: dayStale ? dayWindow : existing.dailyReset,
-          burstCount: burstStale ? 1 : existing.burstCount + 1,
-          burstReset: burstStale ? burstWindow : existing.burstReset,
-        },
+        data: next,
       });
     });
 
-    if (row.dailyCount > DAILY_LIMIT || row.burstCount > BURST_LIMIT) {
+    if (isOverLimit(row.dailyCount, row.burstCount, DAILY_LIMIT, BURST_LIMIT)) {
       return res.status(429).json({
         error: "Rate limit reached. Please try again later.",
       });
