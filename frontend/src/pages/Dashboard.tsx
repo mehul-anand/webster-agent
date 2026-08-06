@@ -533,9 +533,10 @@ export default function Dashboard() {
         idx >= info.first &&
         idx < info.first + info.count
       ) {
-        document
-          .querySelector(`[data-msg-id="${chatMessages[i].id}"]`)
-          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        const root = document.querySelector(`[data-msg-id="${chatMessages[i].id}"]`);
+        const local = idx - info.first;
+        const el = root?.querySelector(`[data-find-index="${local}"]`);
+        (el ?? root)?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
     }

@@ -94,9 +94,10 @@ export function AssistantMessage({
     ? answer.replace(
         new RegExp(`(${escapeRegex(highlight)})`, "gi"),
         (m) => {
+          const idx = matchCount;
           const active = activeMatch === matchCount;
           matchCount += 1;
-          return `<mark style="background:var(--highlight);border-radius:2px;color:inherit${
+          return `<mark data-find-index="${idx}" style="background:var(--highlight);border-radius:2px;color:inherit${
             active ? ";box-shadow:0 0 0 1.5px var(--text-link)" : ""
           }">${m}</mark>`;
         },

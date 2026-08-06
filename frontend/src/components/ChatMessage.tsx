@@ -21,7 +21,7 @@ function highlightText(
     if (part.toLowerCase() !== term.toLowerCase()) return part;
     m += 1;
     return (
-      <span key={i} style={activeLocal === m ? activeStyle : style}>
+      <span key={i} data-find-index={m} style={activeLocal === m ? activeStyle : style}>
         {part}
       </span>
     );
