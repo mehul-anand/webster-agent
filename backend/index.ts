@@ -138,7 +138,6 @@ app.get("/conversations", middleware, async (req, res) => {
     where: { supabaseId: req.userId },
     include: {
       conversations: {
-        orderBy: { messages: { _count: "desc" } },
         include: {
           messages: {
             take: 1,
@@ -154,7 +153,13 @@ app.get("/conversations", middleware, async (req, res) => {
     return res.json([]);
   }
 
-  res.json(user.conversations);
+  const conversations = [...user.conversations].sort(
+    (a, b) =>
+      new Date(b.messages[0]?.createdAt ?? 0).getTime() -
+      new Date(a.messages[0]?.createdAt ?? 0).getTime(),
+  );
+
+  res.json(conversations);
 });
 
 // Get a specific conversation
