@@ -11,18 +11,21 @@ function highlightText(
   text: string,
   term: string,
   style: React.CSSProperties,
+  activeStyle: React.CSSProperties,
+  activeLocal: number | null,
 ): React.ReactNode {
   if (!term) return text;
   const parts = text.split(new RegExp(`(${escapeRegex(term)})`, "gi"));
-  return parts.map((part, i) =>
-    part.toLowerCase() === term.toLowerCase() ? (
-      <span key={i} style={style}>
+  let m = -1;
+  return parts.map((part, i) => {
+    if (part.toLowerCase() !== term.toLowerCase()) return part;
+    m += 1;
+    return (
+      <span key={i} style={activeLocal === m ? activeStyle : style}>
         {part}
       </span>
-    ) : (
-      part
-    ),
-  );
+    );
+  });
 }
 
 function initials(name: string) {
@@ -40,12 +43,14 @@ export function ChatMessage({
   streaming,
   onFollowUp,
   highlight,
+  activeMatch,
   userName,
 }: {
   msg: Message;
   streaming: boolean;
   onFollowUp: (q: string) => void;
   highlight: string;
+  activeMatch: number | null;
   userName: string;
 }) {
   const isUser = msg.role === "User";
@@ -83,10 +88,20 @@ export function ChatMessage({
             }}
           >
             {highlight
-              ? highlightText(msg.content, highlight, {
-                  background: "var(--highlight)",
-                  borderRadius: "2px",
-                })
+              ? highlightText(
+                  msg.content,
+                  highlight,
+                  {
+                    background: "var(--highlight)",
+                    borderRadius: "2px",
+                  },
+                  {
+                    background: "var(--highlight)",
+                    borderRadius: "2px",
+                    boxShadow: "0 0 0 1.5px var(--text-link)",
+                  },
+                  activeMatch,
+                )
               : msg.content}
           </div>
         ) : (
@@ -95,6 +110,7 @@ export function ChatMessage({
             streaming={streaming}
             onFollowUp={onFollowUp}
             highlight={highlight}
+            activeMatch={activeMatch}
           />
         )}
       </div>

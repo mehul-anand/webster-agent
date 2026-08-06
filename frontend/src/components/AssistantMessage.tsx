@@ -77,18 +77,27 @@ export function AssistantMessage({
   streaming,
   onFollowUp,
   highlight,
+  activeMatch,
 }: {
   content: string;
   streaming?: boolean;
   onFollowUp?: (q: string) => void;
   highlight?: string;
+  activeMatch?: number | null;
 }) {
   const { answer, followUps, sources } = parseAssistantContent(content);
 
+  let matchCount = 0;
   const highlighted = highlight
     ? answer.replace(
         new RegExp(`(${escapeRegex(highlight)})`, "gi"),
-        '<mark style="background:var(--highlight);border-radius:2px;color:inherit">$1</mark>',
+        (m) => {
+          const active = activeMatch === matchCount;
+          matchCount += 1;
+          return `<mark style="background:var(--highlight);border-radius:2px;color:inherit${
+            active ? ";box-shadow:0 0 0 1.5px var(--text-link)" : ""
+          }">${m}</mark>`;
+        },
       )
     : answer;
 

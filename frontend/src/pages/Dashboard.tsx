@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { flushSync } from "react-dom";
 import axios from "axios";
 import { Sidebar } from "@/components/Sidebar";
 import { BottomBar } from "@/components/BottomBar";
@@ -12,6 +13,7 @@ import { FindBar } from "@/components/FindBar";
 import { TypingDots } from "@/components/TypingDots";
 import { LandingGate } from "@/components/LandingGate";
 import { AnswerNotification } from "@/components/AnswerNotification";
+import { parseAssistantContent } from "@/lib/parseAssistantContent";
 import type { AnswerToast } from "@/components/AnswerNotification";
 import type { Message, Conversation } from "@/types/dashboard";
 import { useMediaQuery } from "@/lib/useMediaQuery";
@@ -27,6 +29,14 @@ async function getJwt() {
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function countFindMatches(msg: Message, term: string): number {
+  const text =
+    msg.role === "User"
+      ? msg.content
+      : parseAssistantContent(msg.content).answer;
+  return (text.match(new RegExp(escapeRegex(term), "gi")) || []).length;
 }
 
 type ActiveStream = {
@@ -429,28 +439,32 @@ export default function Dashboard() {
     navigate("/");
   }
 
-  const totalMatches = useMemo(() => {
-    if (!findText) return 0;
-    const re = new RegExp(escapeRegex(findText), "gi");
-    let count = 0;
+  const matchInfo = useMemo(() => {
+    const info: { first: number | null; count: number }[] = [];
+    let acc = 0;
     for (const msg of chatMessages) {
-      const m = msg.content.match(re);
-      if (m) count += m.length;
+      const count = countFindMatches(msg, findText);
+      info.push(count > 0 ? { first: acc, count } : { first: null, count: 0 });
+      acc += count;
     }
-    return count;
+    return info;
   }, [chatMessages, findText]);
+  const totalMatches = matchInfo.reduce((sum, i) => sum + i.count, 0);
 
   function scrollToMatch(idx: number) {
     if (!findText || totalMatches === 0) return;
-    let accumulated = 0;
-    for (const msg of chatMessages) {
-      const count = (msg.content.match(new RegExp(escapeRegex(findText), "gi")) || []).length;
-      if (idx < accumulated + count) {
-        const el = document.querySelector(`[data-msg-id="${msg.id}"]`);
-        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    for (let i = 0; i < chatMessages.length; i++) {
+      const info = matchInfo[i];
+      if (
+        info.first !== null &&
+        idx >= info.first &&
+        idx < info.first + info.count
+      ) {
+        document
+          .querySelector(`[data-msg-id="${chatMessages[i].id}"]`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
-      accumulated += count;
     }
   }
 
@@ -469,8 +483,11 @@ export default function Dashboard() {
   }
 
   function openFind() {
-    setFindOpen(true);
-    setTimeout(() => findInputRef.current?.select(), 50);
+    flushSync(() => {
+      setFindOpen(true);
+      setFindMatchIndex(0);
+    });
+    findInputRef.current?.select();
   }
 
   function closeFind() {
@@ -513,8 +530,9 @@ export default function Dashboard() {
       : e.convId === null && e.key === pendingKeyRef.current,
   );
 
-  const findBarEl = findOpen ? (
+  const findBarEl = (
     <FindBar
+      open={findOpen}
       findText={findText}
       totalMatches={totalMatches}
       findMatchIndex={findMatchIndex}
@@ -528,7 +546,7 @@ export default function Dashboard() {
       inputRef={findInputRef}
       align={isMobile ? "bottom" : "top"}
     />
-  ) : null;
+  );
 
   return (
     <div
@@ -646,6 +664,13 @@ export default function Dashboard() {
               viewStreaming &&
               msg.role === "Assistant" &&
               i === chatMessages.length - 1;
+            const info = matchInfo[i];
+            const activeLocal =
+              info.first !== null &&
+              findMatchIndex >= info.first &&
+              findMatchIndex < info.first + info.count
+                ? findMatchIndex - info.first
+                : null;
             return (
               <ChatMessage
                 key={msg.id}
@@ -653,6 +678,7 @@ export default function Dashboard() {
                 streaming={isStreaming}
                 onFollowUp={ask}
                 highlight={findText}
+                activeMatch={activeLocal}
                 userName={user.user_metadata.full_name}
               />
             );
