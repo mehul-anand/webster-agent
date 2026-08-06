@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { flushSync } from "react-dom";
 import axios from "axios";
+import { ArrowDown } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
 import { BottomBar } from "@/components/BottomBar";
 import { ChatMessage } from "@/components/ChatMessage";
@@ -75,6 +76,7 @@ export default function Dashboard() {
   const [findMatchIndex, setFindMatchIndex] = useState(0);
   const [streamingList, setStreamingList] = useState<StreamInfo[]>([]);
   const [toasts, setToasts] = useState<AnswerToast[]>([]);
+  const [showScrollDown, setShowScrollDown] = useState(false);
 
   const isMobile = useMediaQuery("(max-width: 767px)");
 
@@ -87,6 +89,8 @@ export default function Dashboard() {
   const pendingKeyRef = useRef("");
   const navEpochRef = useRef(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const nearBottomRef = useRef(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const findInputRef = useRef<HTMLInputElement>(null);
@@ -146,7 +150,11 @@ export default function Dashboard() {
           closeFind();
           return;
         }
-        setSearchOpen(false);
+        if (searchOpenRef.current) {
+          setSearchOpen(false);
+          setSearch("");
+          return;
+        }
         setThemePickerOpen(false);
         if (isMobile) setSidebarOpen(false);
         return;
@@ -201,6 +209,7 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]);
   useEffect(() => {
+    if (!nearBottomRef.current) return;
     const timer = setTimeout(() => {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 50);
@@ -222,12 +231,34 @@ export default function Dashboard() {
     return activeIdRef.current === null && pendingKeyRef.current === s.key;
   }
 
+  function resetScroll() {
+    nearBottomRef.current = true;
+    setShowScrollDown(false);
+  }
+
+  function onMessagesScroll() {
+    const el = messagesRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    nearBottomRef.current = near;
+    setShowScrollDown(!near);
+  }
+
+  function scrollToBottom() {
+    const el = messagesRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    nearBottomRef.current = true;
+    setShowScrollDown(false);
+  }
+
   async function selectConversation(id: string) {
     navEpochRef.current += 1;
     activeIdRef.current = id;
     setActiveId(id);
     setQuery("");
     setChatMessages([]);
+    resetScroll();
     setChatLoading(true);
     const jwt = await getJwt();
     const { data } = await axios.get(
@@ -252,6 +283,7 @@ export default function Dashboard() {
     activeIdRef.current = null;
     setActiveId(null);
     setChatMessages([]);
+    resetScroll();
     setQuery("");
   }
 
@@ -262,6 +294,7 @@ export default function Dashboard() {
     activeIdRef.current = null;
     pendingKeyRef.current = key;
     setActiveId(null);
+    resetScroll();
     const msgs: Message[] = [];
     if (s.title) {
       msgs.push({ id: Date.now(), content: s.title, role: "User", createdAt: new Date().toISOString() });
@@ -577,7 +610,14 @@ export default function Dashboard() {
         onClose={() => setSidebarOpen(false)}
         onToggle={() => setSidebarOpen((v) => !v)}
         onSearchChange={setSearch}
-        onToggleSearch={() => setSearchOpen((v) => !v)}
+        onToggleSearch={() => {
+          if (searchOpen) {
+            setSearchOpen(false);
+            setSearch("");
+          } else {
+            setSearchOpen(true);
+          }
+        }}
         onToggleThemePicker={() => setThemePickerOpen((v) => !v)}
         onOpenThemePicker={() => setThemePickerOpen(true)}
         onLogout={logout}
@@ -625,70 +665,89 @@ export default function Dashboard() {
 
         {!isMobile && findBarEl}
 
-        <div
-          className="flex-1 space-y-6 overflow-y-auto px-4 pt-6 pb-10 md:pb-6"
-          style={{
-            paddingTop:
-              isMobile && !activeId
-                ? "calc(1.5rem + env(safe-area-inset-top))"
-                : undefined,
-          }}
-        >
-          {chatLoading && (
-            <div className="flex h-full items-center justify-center">
-              <div className="flex items-center gap-2">
-                <span
-                  className="inline-block size-5 animate-spin rounded-full border-2"
-                  style={{
-                    borderColor: "var(--border)",
-                    borderTopColor: "var(--text-muted)",
-                  }}
-                />
-                <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  Loading conversation…
-                </span>
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div
+            ref={messagesRef}
+            onScroll={onMessagesScroll}
+            className="flex-1 space-y-6 overflow-y-auto px-4 pt-6 pb-10 md:pb-6"
+            style={{
+              paddingTop:
+                isMobile && !activeId
+                  ? "calc(1.5rem + env(safe-area-inset-top))"
+                  : undefined,
+            }}
+          >
+            {chatLoading && (
+              <div className="flex h-full items-center justify-center">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-block size-5 animate-spin rounded-full border-2"
+                    style={{
+                      borderColor: "var(--border)",
+                      borderTopColor: "var(--text-muted)",
+                    }}
+                  />
+                  <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    Loading conversation…
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
-          {!chatLoading && chatMessages.length === 0 && !viewStreaming && (
-            <EmptyState
-              name={firstName}
-              greeting={greeting.current}
-              prompts={prompts}
-              onAsk={ask}
-            />
-          )}
-
-          {chatMessages.map((msg, i) => {
-            const isStreaming =
-              viewStreaming &&
-              msg.role === "Assistant" &&
-              i === chatMessages.length - 1;
-            const info = matchInfo[i];
-            const activeLocal =
-              info.first !== null &&
-              findMatchIndex >= info.first &&
-              findMatchIndex < info.first + info.count
-                ? findMatchIndex - info.first
-                : null;
-            return (
-              <ChatMessage
-                key={msg.id}
-                msg={msg}
-                streaming={isStreaming}
-                onFollowUp={ask}
-                highlight={findText}
-                activeMatch={activeLocal}
-                userName={user.user_metadata.full_name}
-              />
-            );
-          })}
-
-          {viewStreaming &&
-            chatMessages[chatMessages.length - 1]?.role !== "Assistant" && (
-              <TypingDots />
             )}
-          <div ref={chatEndRef} />
+            {!chatLoading && chatMessages.length === 0 && !viewStreaming && (
+              <EmptyState
+                name={firstName}
+                greeting={greeting.current}
+                prompts={prompts}
+                onAsk={ask}
+              />
+            )}
+
+            {chatMessages.map((msg, i) => {
+              const isStreaming =
+                viewStreaming &&
+                msg.role === "Assistant" &&
+                i === chatMessages.length - 1;
+              const info = matchInfo[i];
+              const activeLocal =
+                info.first !== null &&
+                findMatchIndex >= info.first &&
+                findMatchIndex < info.first + info.count
+                  ? findMatchIndex - info.first
+                  : null;
+              return (
+                <ChatMessage
+                  key={msg.id}
+                  msg={msg}
+                  streaming={isStreaming}
+                  onFollowUp={ask}
+                  highlight={findText}
+                  activeMatch={activeLocal}
+                  userName={user.user_metadata.full_name}
+                />
+              );
+            })}
+
+            {viewStreaming &&
+              chatMessages[chatMessages.length - 1]?.role !== "Assistant" && (
+                <TypingDots />
+              )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {showScrollDown && chatMessages.length > 0 && (
+            <button
+              onClick={scrollToBottom}
+              aria-label="Scroll to bottom"
+              className="absolute bottom-4 right-4 z-10 flex size-9 items-center justify-center rounded-full border shadow-sm transition-opacity hover:opacity-80"
+              style={{
+                background: "var(--bg-surface)",
+                borderColor: "var(--border)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              <ArrowDown className="size-4" />
+            </button>
+          )}
         </div>
 
         {isMobile && findBarEl}
@@ -712,7 +771,10 @@ export default function Dashboard() {
         </div>
 
         <BottomBar
-          onNewChat={newChat}
+          onNewChat={() => {
+            newChat();
+            if (isMobile) setSidebarOpen(false);
+          }}
           onFind={() => (findOpen ? closeFind() : openFind())}
           onMenu={() => setSidebarOpen(true)}
         />

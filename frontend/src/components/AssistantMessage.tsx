@@ -1,6 +1,8 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeRaw from "rehype-raw";
+import rehypeKatex from "rehype-katex";
 import { Check, Copy } from "lucide-react";
 import { isValidElement, useState } from "react";
 import { ExternalLink } from "./ExternalLink";
@@ -133,8 +135,12 @@ export function AssistantMessage({
         } as React.CSSProperties}
       >
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeRaw]}
+          remarkPlugins={streaming ? [remarkGfm] : [remarkGfm, remarkMath]}
+          rehypePlugins={
+            streaming
+              ? [rehypeRaw]
+              : [rehypeRaw, [rehypeKatex, { throwOnError: false, strict: false }]]
+          }
           components={{
             a: ({ href, children }) => (
               <ExternalLink href={href}>{children}</ExternalLink>

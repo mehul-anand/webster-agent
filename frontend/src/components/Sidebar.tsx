@@ -122,39 +122,6 @@ export function Sidebar({
           <>
             <div className="shrink-0 space-y-1 p-2">
               <SidebarBtn icon={<Plus />} label="New chat" active={activeId === null} onClick={onNewChat} />
-              <SidebarBtn
-                icon={<Search />}
-                label="Search chats"
-                hint="⌘⇧F / Ctrl+Shift+F"
-                onClick={() => {
-                  onToggleSearch();
-                  setTimeout(() => searchInputRef.current?.focus(), 50);
-                }}
-              />
-              {searchOpen && (
-                <input
-                  ref={searchInputRef}
-                  value={search}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "w") {
-                      e.preventDefault();
-                      const el = e.currentTarget;
-                      const start = el.selectionStart ?? search.length;
-                      const [newValue, newCursor] = killWordBackward(search, start);
-                      onSearchChange(newValue);
-                      setTimeout(() => el.setSelectionRange(newCursor, newCursor), 0);
-                    }
-                  }}
-                  placeholder="Filter conversations…"
-                  className="w-full rounded-lg px-3 py-1.5 text-sm outline-none"
-                  style={{
-                    background: "var(--bg-input)",
-                    border: "1px solid var(--border-input)",
-                    color: "var(--text-primary)",
-                  }}
-                />
-              )}
             </div>
 
             <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
@@ -253,6 +220,36 @@ export function Sidebar({
                 <ThemePicker onClose={onToggleThemePicker} />
               )}
               <SidebarBtn
+                icon={searchOpen ? <X /> : <Search />}
+                label={searchOpen ? "Close search" : "Search chats"}
+                hint={searchOpen ? undefined : "⌘⇧F / Ctrl+Shift+F"}
+                onClick={onToggleSearch}
+              />
+              {searchOpen && (
+                <input
+                  ref={searchInputRef}
+                  value={search}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "w") {
+                      e.preventDefault();
+                      const el = e.currentTarget;
+                      const start = el.selectionStart ?? search.length;
+                      const [newValue, newCursor] = killWordBackward(search, start);
+                      onSearchChange(newValue);
+                      setTimeout(() => el.setSelectionRange(newCursor, newCursor), 0);
+                    }
+                  }}
+                  placeholder="Filter conversations…"
+                  className="w-full rounded-lg px-3 py-1.5 text-sm outline-none"
+                  style={{
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-input)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+              )}
+              <SidebarBtn
                 icon={<Palette />}
                 label="Theme"
                 onClick={onToggleThemePicker}
@@ -275,7 +272,7 @@ export function Sidebar({
                 title="Search (⌘⇧F / Ctrl+Shift+F)"
                 onClick={() => {
                   onToggle();
-                  setTimeout(() => searchInputRef.current?.focus(), 100);
+                  if (!searchOpen) onToggleSearch();
                 }}
               >
                 <Search />
