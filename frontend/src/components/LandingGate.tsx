@@ -44,7 +44,7 @@ const features = [
 export function LandingGate({ onSignIn }: { onSignIn: () => void }) {
   return (
     <div
-      className="relative min-h-screen overflow-hidden"
+      className="relative min-h-dvh overflow-hidden"
       style={{ background: "var(--bg)", color: "var(--text-primary)" }}
     >
       <div

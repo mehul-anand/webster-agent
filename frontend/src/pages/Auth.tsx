@@ -50,7 +50,7 @@ export default function Auth() {
 
   return (
     <div
-      className="relative flex min-h-screen items-center justify-center overflow-hidden p-4"
+      className="relative flex min-h-dvh items-center justify-center overflow-hidden p-4"
       style={{ background: "var(--bg)" }}
     >
       <div

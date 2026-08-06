@@ -476,7 +476,7 @@ export default function Dashboard() {
   if (authLoading) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center"
+        className="flex min-h-dvh items-center justify-center"
         style={{ background: "var(--bg)" }}
       >
         <div className="flex items-center gap-2">
@@ -509,7 +509,7 @@ export default function Dashboard() {
 
   return (
     <div
-      className="flex h-screen overflow-hidden"
+      className="flex h-dvh overflow-hidden"
       style={{ background: "var(--bg)", color: "var(--text-primary)" }}
     >
       {/* ── Sidebar ── */}
@@ -548,7 +548,11 @@ export default function Dashboard() {
         {isMobile && !sidebarOpen && (
           <div
             className="flex h-12 shrink-0 items-center border-b px-3"
-            style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--bg-surface)",
+              paddingTop: "env(safe-area-inset-top)",
+            }}
           >
             <button
               onClick={() => setSidebarOpen(true)}
@@ -575,8 +579,12 @@ export default function Dashboard() {
 
         {activeId && !chatLoading && (
           <div
-            className="shrink-0 border-b px-4 py-2.5 text-center"
-            style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+            className="hidden shrink-0 border-b px-4 py-2.5 text-center md:block"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--bg)",
+              paddingTop: "calc(0.625rem + env(safe-area-inset-top))",
+            }}
           >
             <span
               className="text-sm font-medium"
@@ -658,7 +666,11 @@ export default function Dashboard() {
 
         <div
           className="border-t px-4 py-4"
-          style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+          style={{
+            borderColor: "var(--border)",
+            background: "var(--bg)",
+            paddingBottom: "calc(1rem + env(safe-area-inset-bottom))",
+          }}
         >
           <InputBar
             value={query}
