@@ -292,8 +292,8 @@ export function Sidebar({
                         ? "var(--text-primary)"
                         : "var(--text-secondary)",
                     boxShadow:
-                      i === safeSearchIndex
-                        ? "0 0 0 1.5px var(--text-link)"
+                      search && i === safeSearchIndex
+                        ? "0 0 0 1.5px var(--text-link), 0 0 0 4px var(--bg-surface)"
                         : undefined,
                   }}
                 >

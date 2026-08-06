@@ -52,7 +52,7 @@ export function FindBar({
           }
         }}
         placeholder="Find in chat…"
-        className="flex-1 rounded-lg px-3 py-1.5 text-sm outline-none"
+        className="flex-1 rounded-lg px-3 py-2.5 text-sm outline-none"
         style={{
           background: "var(--bg-input)",
           border: "1px solid var(--border-input)",
@@ -68,18 +68,18 @@ export function FindBar({
       <button
         onClick={onPrev}
         disabled={!findText || totalMatches === 0}
-        className="rounded p-1 transition-opacity hover:opacity-70 disabled:opacity-20"
+        className="rounded p-1.5 transition-opacity hover:opacity-70 disabled:opacity-20"
         style={{ color: "var(--text-muted)" }}
       >
-        <ChevronUp className="size-3.5" />
+        <ChevronUp className="size-5" strokeWidth={2.5} />
       </button>
       <button
         onClick={onNext}
         disabled={!findText || totalMatches === 0}
-        className="rounded p-1 transition-opacity hover:opacity-70 disabled:opacity-20"
+        className="rounded p-1.5 transition-opacity hover:opacity-70 disabled:opacity-20"
         style={{ color: "var(--text-muted)" }}
       >
-        <ChevronDown className="size-3.5" />
+        <ChevronDown className="size-5" strokeWidth={2.5} />
       </button>
       <button
         onClick={onClose}

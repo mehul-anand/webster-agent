@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { flushSync } from "react-dom";
 import axios from "axios";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Menu } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
 import { BottomBar } from "@/components/BottomBar";
 import { ChatMessage } from "@/components/ChatMessage";
@@ -83,6 +83,42 @@ export default function Dashboard() {
   useEffect(() => {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
+
+  // Mobile swipe gestures: right-swipe from the left edge opens the sidebar,
+  // left-swipe closes it.
+  useEffect(() => {
+    if (!isMobile) return;
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+    function onTouchStart(e: TouchEvent) {
+      const t = e.touches[0];
+      if (!t) return;
+      startX = t.clientX;
+      startY = t.clientY;
+      tracking = true;
+    }
+    function onTouchEnd(e: TouchEvent) {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      if (sidebarOpen) {
+        if (dx < 0) setSidebarOpen(false);
+      } else if (startX < 30 && dx > 0) {
+        setSidebarOpen(true);
+      }
+    }
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [isMobile, sidebarOpen]);
 
   const streamsRef = useRef(new Map<string, ActiveStream>());
   const activeIdRef = useRef<string | null>(null);
@@ -604,7 +640,11 @@ export default function Dashboard() {
   return (
     <div
       className="flex h-dvh overflow-hidden"
-      style={{ background: "var(--bg)", color: "var(--text-primary)" }}
+      style={{
+        background: "var(--bg)",
+        color: "var(--text-primary)",
+        touchAction: "pan-y",
+      }}
     >
       {/* ── Sidebar ── */}
       <Sidebar
@@ -660,6 +700,14 @@ export default function Dashboard() {
               paddingTop: "env(safe-area-inset-top)",
             }}
           >
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open sidebar"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md transition-opacity hover:opacity-70"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <Menu className="size-5" />
+            </button>
             <span
               className="flex-1 truncate text-center text-sm font-medium"
               style={{ color: "var(--text-primary)" }}
