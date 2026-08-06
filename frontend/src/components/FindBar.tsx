@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { useState } from "react";
 import { killWordBackward } from "@/lib/utils";
 
 export function FindBar({
@@ -10,6 +11,7 @@ export function FindBar({
   onNext,
   onClose,
   inputRef,
+  isMobile = false,
   align = "top",
   open = true,
 }: {
@@ -21,9 +23,12 @@ export function FindBar({
   onNext: () => void;
   onClose: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
+  isMobile?: boolean;
   align?: "top" | "bottom";
   open?: boolean;
 }) {
+  const [focused, setFocused] = useState(false);
+
   return (
     <div
       className={`${open ? "" : "hidden "}flex shrink-0 items-center gap-2 px-4 py-2 ${align === "top" ? "border-b" : ""}`}
@@ -32,6 +37,8 @@ export function FindBar({
       <input
         ref={inputRef}
         value={findText}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onChange={(e) => {
           onFindTextChange(e.target.value);
         }}
@@ -65,22 +72,34 @@ export function FindBar({
       >
         {findText ? `${findMatchIndex + 1}/${totalMatches}` : ""}
       </span>
-      <button
-        onClick={onPrev}
-        disabled={!findText || totalMatches === 0}
-        className="rounded p-1.5 transition-opacity hover:opacity-70 disabled:opacity-20"
-        style={{ color: "var(--text-muted)" }}
-      >
-        <ChevronUp className="size-5" strokeWidth={2.5} />
-      </button>
-      <button
-        onClick={onNext}
-        disabled={!findText || totalMatches === 0}
-        className="rounded p-1.5 transition-opacity hover:opacity-70 disabled:opacity-20"
-        style={{ color: "var(--text-muted)" }}
-      >
-        <ChevronDown className="size-5" strokeWidth={2.5} />
-      </button>
+      {(!isMobile || !focused) && (
+        <>
+          <button
+            onClick={onPrev}
+            disabled={!findText || totalMatches === 0}
+            className="flex size-8 items-center justify-center rounded-full border transition-opacity hover:opacity-80 disabled:opacity-30"
+            style={{
+              background: "var(--bg-input)",
+              borderColor: "var(--border-input)",
+              color: "var(--text-primary)",
+            }}
+          >
+            <ChevronUp className="size-5" strokeWidth={2.5} />
+          </button>
+          <button
+            onClick={onNext}
+            disabled={!findText || totalMatches === 0}
+            className="flex size-8 items-center justify-center rounded-full border transition-opacity hover:opacity-80 disabled:opacity-30"
+            style={{
+              background: "var(--bg-input)",
+              borderColor: "var(--border-input)",
+              color: "var(--text-primary)",
+            }}
+          >
+            <ChevronDown className="size-5" strokeWidth={2.5} />
+          </button>
+        </>
+      )}
       <button
         onClick={onClose}
         className="rounded p-1 transition-opacity hover:opacity-70"

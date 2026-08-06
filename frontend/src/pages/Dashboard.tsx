@@ -84,8 +84,7 @@ export default function Dashboard() {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
-  // Mobile swipe gestures: right-swipe from the left edge opens the sidebar,
-  // left-swipe closes it.
+  // Mobile swipe gesture: left-swipe closes the sidebar.
   useEffect(() => {
     if (!isMobile) return;
     let startX = 0;
@@ -106,11 +105,7 @@ export default function Dashboard() {
       const dx = t.clientX - startX;
       const dy = t.clientY - startY;
       if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
-      if (sidebarOpen) {
-        if (dx < 0) setSidebarOpen(false);
-      } else if (startX < 30 && dx > 0) {
-        setSidebarOpen(true);
-      }
+      if (sidebarOpen && dx < 0) setSidebarOpen(false);
     }
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchend", onTouchEnd, { passive: true });
@@ -633,6 +628,7 @@ export default function Dashboard() {
       onNext={goFindNext}
       onClose={closeFind}
       inputRef={findInputRef}
+      isMobile={isMobile}
       align={isMobile ? "bottom" : "top"}
     />
   );
@@ -714,6 +710,7 @@ export default function Dashboard() {
             >
               {activeTitle || "Chat"}
             </span>
+            <span className="size-8 shrink-0" aria-hidden />
           </div>
         )}
 

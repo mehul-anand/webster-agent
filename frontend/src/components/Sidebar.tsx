@@ -73,6 +73,7 @@ export function Sidebar({
   );
 
   const [searchIndex, setSearchIndex] = useState(0);
+  const [searchFocused, setSearchFocused] = useState(false);
   const safeSearchIndex =
     filtered.length === 0 ? 0 : Math.min(searchIndex, filtered.length - 1);
 
@@ -163,10 +164,12 @@ export function Sidebar({
                 onClick={onToggleSearch}
               />
               {searchOpen && (
-                <div className="flex items-center gap-2">
+                <div className="mb-2 flex items-center gap-2">
                   <input
                     ref={searchInputRef}
                     value={search}
+                    onFocus={() => setSearchFocused(true)}
+                    onBlur={() => setSearchFocused(false)}
                     onChange={(e) => {
                       onSearchChange(e.target.value);
                       setSearchIndex(0);
@@ -187,7 +190,7 @@ export function Sidebar({
                       }
                     }}
                     placeholder="Filter conversations…"
-                    className="min-w-0 flex-1 rounded-lg px-3 py-1.5 text-sm outline-none"
+                    className="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-sm outline-none"
                     style={{
                       background: "var(--bg-input)",
                       border: "1px solid var(--border-input)",
@@ -204,22 +207,34 @@ export function Sidebar({
                         : "0/0"
                       : ""}
                   </span>
-                  <button
-                    onClick={() => moveSearch(-1)}
-                    disabled={filtered.length === 0}
-                    className="rounded p-1 transition-opacity hover:opacity-70 disabled:opacity-20"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    <ChevronUp className="size-3.5" />
-                  </button>
-                  <button
-                    onClick={() => moveSearch(1)}
-                    disabled={filtered.length === 0}
-                    className="rounded p-1 transition-opacity hover:opacity-70 disabled:opacity-20"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    <ChevronDown className="size-3.5" />
-                  </button>
+                  {(!isMobile || !searchFocused) && (
+                    <>
+                      <button
+                        onClick={() => moveSearch(-1)}
+                        disabled={filtered.length === 0}
+                        className="flex size-7 items-center justify-center rounded-full border transition-opacity hover:opacity-80 disabled:opacity-30"
+                        style={{
+                          background: "var(--bg-input)",
+                          borderColor: "var(--border-input)",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        <ChevronUp className="size-5" strokeWidth={2.5} />
+                      </button>
+                      <button
+                        onClick={() => moveSearch(1)}
+                        disabled={filtered.length === 0}
+                        className="flex size-7 items-center justify-center rounded-full border transition-opacity hover:opacity-80 disabled:opacity-30"
+                        style={{
+                          background: "var(--bg-input)",
+                          borderColor: "var(--border-input)",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        <ChevronDown className="size-5" strokeWidth={2.5} />
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
