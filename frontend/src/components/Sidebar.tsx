@@ -164,7 +164,7 @@ export function Sidebar({
                 onClick={onToggleSearch}
               />
               {searchOpen && (
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-3 flex items-center gap-2">
                   <input
                     ref={searchInputRef}
                     value={search}
@@ -239,7 +239,7 @@ export function Sidebar({
               )}
             </div>
 
-            <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
+            <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2 pt-2">
               {conversationsLoading && filtered.length === 0 && (
                 <div className="space-y-3 px-3 py-4">
                   {[1, 2, 3].map((i) => (

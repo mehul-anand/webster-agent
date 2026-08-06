@@ -70,7 +70,11 @@ export function FindBar({
         className="min-w-8 text-right text-xs tabular-nums"
         style={{ color: "var(--text-muted)" }}
       >
-        {findText ? `${findMatchIndex + 1}/${totalMatches}` : ""}
+        {findText
+          ? totalMatches === 0
+            ? "0/0"
+            : `${findMatchIndex + 1}/${totalMatches}`
+          : ""}
       </span>
       {(!isMobile || !focused) && (
         <>
