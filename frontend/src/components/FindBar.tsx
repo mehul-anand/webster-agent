@@ -40,6 +40,7 @@ export function FindBar({
             e.preventDefault();
             if (e.shiftKey) onPrev();
             else onNext();
+            e.currentTarget.blur();
           }
           if ((e.metaKey || e.ctrlKey) && e.key === "w") {
             e.preventDefault();

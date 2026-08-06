@@ -1,4 +1,5 @@
-import { ChevronRight, LogOut, Palette, Plus, Search, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronDown, ChevronRight, ChevronUp, LogOut, Palette, Plus, Search, X } from "lucide-react";
 import type { Conversation } from "@/types/dashboard";
 import { IconBtn } from "./IconBtn";
 import { SidebarBtn } from "./SidebarBtn";
@@ -71,6 +72,39 @@ export function Sidebar({
     streaming.map((s) => s.convId).filter((v): v is string => v !== null),
   );
 
+  const [searchIndex, setSearchIndex] = useState(0);
+  const safeSearchIndex =
+    filtered.length === 0 ? 0 : Math.min(searchIndex, filtered.length - 1);
+
+  function moveSearch(delta: number) {
+    if (filtered.length === 0) return;
+    setSearchIndex((i) => (i + delta + filtered.length) % filtered.length);
+  }
+
+  useEffect(() => {
+    if (!open || !searchOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        moveSearch(e.key === "ArrowUp" ? -1 : 1);
+      } else if (e.key === "Enter") {
+        const row = filtered[safeSearchIndex];
+        if (row) {
+          e.preventDefault();
+          onSelect(row.id);
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   return (
     <>
       {isMobile && open && (
@@ -122,6 +156,72 @@ export function Sidebar({
           <>
             <div className="shrink-0 space-y-1 p-2">
               <SidebarBtn icon={<Plus />} label="New chat" active={activeId === null} onClick={onNewChat} />
+              <SidebarBtn
+                icon={searchOpen ? <X /> : <Search />}
+                label={searchOpen ? "Close search" : "Search chats"}
+                hint={searchOpen ? undefined : "⌘⇧F / Ctrl+Shift+F"}
+                onClick={onToggleSearch}
+              />
+              {searchOpen && (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={searchInputRef}
+                    value={search}
+                    onChange={(e) => {
+                      onSearchChange(e.target.value);
+                      setSearchIndex(0);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                      }
+                      if ((e.metaKey || e.ctrlKey) && e.key === "w") {
+                        e.preventDefault();
+                        const el = e.currentTarget;
+                        const start = el.selectionStart ?? search.length;
+                        const [newValue, newCursor] = killWordBackward(search, start);
+                        onSearchChange(newValue);
+                        setSearchIndex(0);
+                        setTimeout(() => el.setSelectionRange(newCursor, newCursor), 0);
+                      }
+                    }}
+                    placeholder="Filter conversations…"
+                    className="min-w-0 flex-1 rounded-lg px-3 py-1.5 text-sm outline-none"
+                    style={{
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-input)",
+                      color: "var(--text-primary)",
+                    }}
+                  />
+                  <span
+                    className="min-w-8 text-right text-xs tabular-nums"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {search
+                      ? filtered.length
+                        ? `${safeSearchIndex + 1}/${filtered.length}`
+                        : "0/0"
+                      : ""}
+                  </span>
+                  <button
+                    onClick={() => moveSearch(-1)}
+                    disabled={filtered.length === 0}
+                    className="rounded p-1 transition-opacity hover:opacity-70 disabled:opacity-20"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <ChevronUp className="size-3.5" />
+                  </button>
+                  <button
+                    onClick={() => moveSearch(1)}
+                    disabled={filtered.length === 0}
+                    className="rounded p-1 transition-opacity hover:opacity-70 disabled:opacity-20"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <ChevronDown className="size-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
@@ -178,7 +278,7 @@ export function Sidebar({
                   </div>
                 </button>
               ))}
-              {filtered.map((c) => (
+              {filtered.map((c, i) => (
                 <button
                   key={c.id}
                   onClick={() => onSelect(c.id)}
@@ -191,6 +291,10 @@ export function Sidebar({
                       activeId === c.id
                         ? "var(--text-primary)"
                         : "var(--text-secondary)",
+                    boxShadow:
+                      i === safeSearchIndex
+                        ? "0 0 0 1.5px var(--text-link)"
+                        : undefined,
                   }}
                 >
                   <div className="min-w-0 flex-1">
@@ -218,36 +322,6 @@ export function Sidebar({
             <div className="relative shrink-0 space-y-1 px-3 py-4">
               {themePickerOpen && (
                 <ThemePicker onClose={onToggleThemePicker} />
-              )}
-              <SidebarBtn
-                icon={searchOpen ? <X /> : <Search />}
-                label={searchOpen ? "Close search" : "Search chats"}
-                hint={searchOpen ? undefined : "⌘⇧F / Ctrl+Shift+F"}
-                onClick={onToggleSearch}
-              />
-              {searchOpen && (
-                <input
-                  ref={searchInputRef}
-                  value={search}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "w") {
-                      e.preventDefault();
-                      const el = e.currentTarget;
-                      const start = el.selectionStart ?? search.length;
-                      const [newValue, newCursor] = killWordBackward(search, start);
-                      onSearchChange(newValue);
-                      setTimeout(() => el.setSelectionRange(newCursor, newCursor), 0);
-                    }
-                  }}
-                  placeholder="Filter conversations…"
-                  className="w-full rounded-lg px-3 py-1.5 text-sm outline-none"
-                  style={{
-                    background: "var(--bg-input)",
-                    border: "1px solid var(--border-input)",
-                    color: "var(--text-primary)",
-                  }}
-                />
               )}
               <SidebarBtn
                 icon={<Palette />}

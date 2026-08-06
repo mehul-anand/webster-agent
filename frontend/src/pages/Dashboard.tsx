@@ -128,9 +128,7 @@ export default function Dashboard() {
           setSearchOpen(false);
           setSearch("");
         } else {
-          setSidebarOpen(true);
-          setSearchOpen(true);
-          setTimeout(() => searchInputRef.current?.focus(), 50);
+          openSidebarSearch();
         }
         return;
       }
@@ -138,6 +136,17 @@ export default function Dashboard() {
         e.preventDefault();
         if (findOpenRef.current) closeFind();
         else openFind();
+        return;
+      }
+      if (
+        (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+        findOpenRef.current &&
+        !searchOpenRef.current &&
+        !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
+      ) {
+        e.preventDefault();
+        if (e.key === "ArrowUp") findNavRef.current.prev();
+        else findNavRef.current.next();
         return;
       }
       if (e.altKey && (e.key === "t" || e.key === "T")) {
@@ -515,12 +524,23 @@ export default function Dashboard() {
     scrollToMatch(prev);
   }
 
+  const findNavRef = useRef({ next: goFindNext, prev: goFindPrev });
+  findNavRef.current = { next: goFindNext, prev: goFindPrev };
+
   function openFind() {
     flushSync(() => {
       setFindOpen(true);
       setFindMatchIndex(0);
     });
     findInputRef.current?.select();
+  }
+
+  function openSidebarSearch() {
+    flushSync(() => {
+      setSidebarOpen(true);
+      setSearchOpen(true);
+    });
+    searchInputRef.current?.select();
   }
 
   function closeFind() {
@@ -598,7 +618,10 @@ export default function Dashboard() {
         themePickerOpen={themePickerOpen}
         conversationsLoading={conversationsLoading}
         streaming={streamingList}
-        onNewChat={newChat}
+        onNewChat={() => {
+          newChat();
+          if (isMobile) setSidebarOpen(false);
+        }}
         onSelect={(id) => {
           selectConversation(id);
           if (isMobile) setSidebarOpen(false);
@@ -615,7 +638,8 @@ export default function Dashboard() {
             setSearchOpen(false);
             setSearch("");
           } else {
-            setSearchOpen(true);
+            flushSync(() => setSearchOpen(true));
+            searchInputRef.current?.select();
           }
         }}
         onToggleThemePicker={() => setThemePickerOpen((v) => !v)}
