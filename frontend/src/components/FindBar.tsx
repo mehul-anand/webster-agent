@@ -10,6 +10,7 @@ export function FindBar({
   onNext,
   onClose,
   inputRef,
+  align = "top",
 }: {
   findText: string;
   totalMatches: number;
@@ -19,10 +20,11 @@ export function FindBar({
   onNext: () => void;
   onClose: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
+  align?: "top" | "bottom";
 }) {
   return (
     <div
-      className="flex shrink-0 items-center gap-2 border-b px-4 py-2"
+      className={`flex shrink-0 items-center gap-2 px-4 py-2 ${align === "top" ? "border-b" : ""}`}
       style={{ borderColor: "var(--border)", background: "var(--bg)" }}
     >
       <input

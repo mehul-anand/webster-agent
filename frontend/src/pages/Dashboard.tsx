@@ -122,12 +122,8 @@ export default function Dashboard() {
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === "f" || e.key === "F")) {
         e.preventDefault();
-        if (findOpenRef.current) {
-          setFindOpen(false);
-        } else {
-          setFindOpen(true);
-          setTimeout(() => findInputRef.current?.select(), 50);
-        }
+        if (findOpenRef.current) closeFind();
+        else openFind();
         return;
       }
       if (e.altKey && (e.key === "t" || e.key === "T")) {
@@ -137,8 +133,7 @@ export default function Dashboard() {
       }
       if (e.key === "Escape") {
         if (findOpenRef.current) {
-          setFindOpen(false);
-          setFindText("");
+          closeFind();
           return;
         }
         setSearchOpen(false);
@@ -473,6 +468,17 @@ export default function Dashboard() {
     scrollToMatch(prev);
   }
 
+  function openFind() {
+    setFindOpen(true);
+    setTimeout(() => findInputRef.current?.select(), 50);
+  }
+
+  function closeFind() {
+    setFindOpen(false);
+    setFindText("");
+    chatInputRef.current?.focus();
+  }
+
   if (authLoading) {
     return (
       <div
@@ -506,6 +512,23 @@ export default function Dashboard() {
       ? e.convId === activeId
       : e.convId === null && e.key === pendingKeyRef.current,
   );
+
+  const findBarEl = findOpen ? (
+    <FindBar
+      findText={findText}
+      totalMatches={totalMatches}
+      findMatchIndex={findMatchIndex}
+      onFindTextChange={(v) => {
+        setFindText(v);
+        setFindMatchIndex(0);
+      }}
+      onPrev={goFindPrev}
+      onNext={goFindNext}
+      onClose={closeFind}
+      inputRef={findInputRef}
+      align={isMobile ? "bottom" : "top"}
+    />
+  ) : null;
 
   return (
     <div
@@ -545,12 +568,13 @@ export default function Dashboard() {
 
       {/* ── Main ── */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {isMobile && !sidebarOpen && (
+        {isMobile && !sidebarOpen && activeId && (
           <div
-            className="flex h-12 shrink-0 items-center border-b px-3"
+            className="flex shrink-0 items-center border-b px-3"
             style={{
               borderColor: "var(--border)",
               background: "var(--bg-surface)",
+              height: "calc(3rem + env(safe-area-inset-top))",
               paddingTop: "env(safe-area-inset-top)",
             }}
           >
@@ -558,7 +582,7 @@ export default function Dashboard() {
               className="flex-1 truncate text-center text-sm font-medium"
               style={{ color: "var(--text-primary)" }}
             >
-              {activeId ? activeTitle || "Chat" : "Webster"}
+              {activeTitle || "Chat"}
             </span>
           </div>
         )}
@@ -581,26 +605,17 @@ export default function Dashboard() {
           </div>
         )}
 
-        {findOpen && (
-          <FindBar
-            findText={findText}
-            totalMatches={totalMatches}
-            findMatchIndex={findMatchIndex}
-            onFindTextChange={(v) => {
-              setFindText(v);
-              setFindMatchIndex(0);
-            }}
-            onPrev={goFindPrev}
-            onNext={goFindNext}
-            onClose={() => {
-              setFindOpen(false);
-              setFindText("");
-            }}
-            inputRef={findInputRef}
-          />
-        )}
+        {!isMobile && findBarEl}
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-4 py-6">
+        <div
+          className="flex-1 space-y-6 overflow-y-auto px-4 pt-6 pb-10 md:pb-6"
+          style={{
+            paddingTop:
+              isMobile && !activeId
+                ? "calc(1.5rem + env(safe-area-inset-top))"
+                : undefined,
+          }}
+        >
           {chatLoading && (
             <div className="flex h-full items-center justify-center">
               <div className="flex items-center gap-2">
@@ -650,6 +665,8 @@ export default function Dashboard() {
           <div ref={chatEndRef} />
         </div>
 
+        {isMobile && findBarEl}
+
         <div
           className="border-t px-4 py-4"
           style={{
@@ -670,7 +687,7 @@ export default function Dashboard() {
 
         <BottomBar
           onNewChat={newChat}
-          onFind={() => setFindOpen((v) => !v)}
+          onFind={() => (findOpen ? closeFind() : openFind())}
           onMenu={() => setSidebarOpen(true)}
         />
       </div>
