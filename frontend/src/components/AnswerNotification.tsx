@@ -82,7 +82,7 @@ export function AnswerNotification({
 }) {
   if (toasts.length === 0) return null;
   return (
-    <div className="fixed bottom-16 right-4 z-50 flex w-72 flex-col gap-2">
+    <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-50 flex w-72 flex-col gap-2 md:bottom-16">
       {toasts.map((t) => (
         <ToastItem key={t.key} toast={t} onView={onView} onDismiss={onDismiss} />
       ))}

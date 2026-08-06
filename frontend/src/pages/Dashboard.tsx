@@ -3,8 +3,8 @@ import type { User } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { Menu, Search } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
+import { BottomBar } from "@/components/BottomBar";
 import { ChatMessage } from "@/components/ChatMessage";
 import { InputBar } from "@/components/InputBar";
 import { EmptyState } from "@/components/EmptyState";
@@ -554,26 +554,12 @@ export default function Dashboard() {
               paddingTop: "env(safe-area-inset-top)",
             }}
           >
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="flex size-8 shrink-0 items-center justify-center rounded-md transition-opacity hover:opacity-70"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <Menu className="size-5" />
-            </button>
             <span
-              className="ml-2 flex-1 truncate text-sm font-medium"
+              className="flex-1 truncate text-center text-sm font-medium"
               style={{ color: "var(--text-primary)" }}
             >
               {activeId ? activeTitle || "Chat" : "Webster"}
             </span>
-            <button
-              onClick={() => setFindOpen((v) => !v)}
-              className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-md transition-opacity hover:opacity-70"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <Search className="size-4" />
-            </button>
           </div>
         )}
 
@@ -669,7 +655,6 @@ export default function Dashboard() {
           style={{
             borderColor: "var(--border)",
             background: "var(--bg)",
-            paddingBottom: "calc(1rem + env(safe-area-inset-bottom))",
           }}
         >
           <InputBar
@@ -682,6 +667,12 @@ export default function Dashboard() {
             inputRef={chatInputRef}
           />
         </div>
+
+        <BottomBar
+          onNewChat={newChat}
+          onFind={() => setFindOpen((v) => !v)}
+          onMenu={() => setSidebarOpen(true)}
+        />
       </div>
 
       {/* \ shortcut tooltip */}
