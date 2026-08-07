@@ -15,6 +15,7 @@ import { TypingDots } from "@/components/TypingDots";
 import { LandingGate } from "@/components/LandingGate";
 import { AnswerNotification } from "@/components/AnswerNotification";
 import { parseAssistantContent } from "@/lib/parseAssistantContent";
+import { countAnswerMatches } from "@/lib/findMath";
 import type { AnswerToast } from "@/components/AnswerNotification";
 import type { Message, Conversation } from "@/types/dashboard";
 import { useMediaQuery } from "@/lib/useMediaQuery";
@@ -28,16 +29,12 @@ async function getJwt() {
   return session?.access_token;
 }
 
-function escapeRegex(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function countFindMatches(msg: Message, term: string): number {
   const text =
     msg.role === "User"
       ? msg.content
       : parseAssistantContent(msg.content).answer;
-  return (text.match(new RegExp(escapeRegex(term), "gi")) || []).length;
+  return countAnswerMatches(text, term);
 }
 
 type ActiveStream = {

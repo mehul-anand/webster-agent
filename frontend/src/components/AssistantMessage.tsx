@@ -8,10 +8,7 @@ import { isValidElement, useState } from "react";
 import { ExternalLink } from "./ExternalLink";
 import { SourcePill } from "./SourcePill";
 import { parseAssistantContent } from "@/lib/parseAssistantContent";
-
-function escapeRegex(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+import { buildHighlightedAnswer, normalizeMathDelimiters } from "@/lib/findMath";
 
 function extractText(node: React.ReactNode): string {
   if (node == null || typeof node === "boolean") return "";
@@ -89,20 +86,9 @@ export function AssistantMessage({
 }) {
   const { answer, followUps, sources } = parseAssistantContent(content);
 
-  let matchCount = 0;
   const highlighted = highlight
-    ? answer.replace(
-        new RegExp(`(${escapeRegex(highlight)})`, "gi"),
-        (m) => {
-          const idx = matchCount;
-          const active = activeMatch === matchCount;
-          matchCount += 1;
-          return `<mark data-find-index="${idx}" style="background:var(--highlight);border-radius:2px;color:inherit${
-            active ? ";box-shadow:0 0 0 1.5px var(--text-link)" : ""
-          }">${m}</mark>`;
-        },
-      )
-    : answer;
+    ? buildHighlightedAnswer(answer, highlight, activeMatch ?? null)
+    : normalizeMathDelimiters(answer);
 
   const followUpsPending =
     streaming &&
