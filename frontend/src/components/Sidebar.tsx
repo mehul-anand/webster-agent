@@ -79,7 +79,11 @@ export function Sidebar({
 
   function moveSearch(delta: number) {
     if (filtered.length === 0) return;
-    setSearchIndex((i) => (i + delta + filtered.length) % filtered.length);
+    const next = (searchIndex + delta + filtered.length) % filtered.length;
+    setSearchIndex(next);
+    document
+      .querySelector(`[data-conv-index="${next}"]`)
+      ?.scrollIntoView({ block: "nearest" });
   }
 
   useEffect(() => {
@@ -177,7 +181,19 @@ export function Sidebar({
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        e.currentTarget.blur();
+                        if (isMobile) {
+                          e.currentTarget.blur();
+                        } else {
+                          const row = filtered[safeSearchIndex];
+                          if (row) onSelect(row.id);
+                        }
+                      }
+                      if (
+                        !isMobile &&
+                        (e.key === "ArrowUp" || e.key === "ArrowDown")
+                      ) {
+                        e.preventDefault();
+                        moveSearch(e.key === "ArrowUp" ? -1 : 1);
                       }
                       if ((e.metaKey || e.ctrlKey) && e.key === "w") {
                         e.preventDefault();
@@ -296,6 +312,7 @@ export function Sidebar({
               {filtered.map((c, i) => (
                 <button
                   key={c.id}
+                  data-conv-index={i}
                   onClick={() => onSelect(c.id)}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-hover)]",
