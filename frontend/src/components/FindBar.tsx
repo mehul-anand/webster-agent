@@ -47,7 +47,12 @@ export function FindBar({
             e.preventDefault();
             if (e.shiftKey) onPrev();
             else onNext();
-            e.currentTarget.blur();
+            if (isMobile) e.currentTarget.blur();
+          }
+          if (!isMobile && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+            e.preventDefault();
+            if (e.key === "ArrowUp") onPrev();
+            else onNext();
           }
           if ((e.metaKey || e.ctrlKey) && e.key === "w") {
             e.preventDefault();
